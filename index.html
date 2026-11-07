@@ -324,7 +324,8 @@ var DKEYS=['android','sites','pdd','content','study','body','life'];
 /* ============================ defaults ============================ */
 function T(o){
   var b={id:uid(),title:'',dir:'sites',min:60,at:null,days:[1,2,3,4,5],weeks:'all',date:null,
-         core:false,note:'',active:true,only:null,minA:null,daysA:null,optional:false,ord:50};
+         core:false,note:'',active:true,only:null,minA:null,daysA:null,optional:false,ord:50,
+         par:null,after:null,floor:0};
   for(var k in o)b[k]=o[k];
   return b;
 }
@@ -332,40 +333,78 @@ function defaults(){
   var t=todayIso();
   return {
     v:1,
-    settings:{mode:'B',wake:'07:30',sleep:'23:30',theme:'dark',goal:60000,
+    settings:{mode:'B',wake:'06:00',sleep:'23:00',theme:'dark',goal:60000,
       parity:{serial:wserial('2026-11-02'),odd:false},breaks:true,
-      norms:{B:{android:19,sites:16,pdd:12,content:7,body:4},A:{android:12,sites:4,pdd:7,content:3,body:2}}},
+      norms:{B:{android:19,sites:16,pdd:12,content:7,body:4.5},A:{android:12,sites:6,pdd:8,content:3,body:3}}},
     tasks:[
       /* --- якоря расписания --- */
       T({title:'ТИСБИ, пары',dir:'study',min:170,at:'08:00',days:[1],weeks:'all',optional:true,note:'Дистант: ходить необязательно, практику всё равно сдавать'}),
       T({id:'tisbi-sat-odd',title:'ТИСБИ, пары',dir:'study',min:260,at:'08:00',days:[6],weeks:'odd',optional:true,note:'Нечётная неделя: 8:00 — 12:20'}),
       T({title:'ТИСБИ, пары',dir:'study',min:170,at:'09:30',days:[6],weeks:'even',optional:true,note:'Чётная неделя: 9:30 — 12:20'}),
-      T({title:'Работа в банке',dir:'life',min:720,at:'09:00',days:[2,3,4,5],only:'A',note:'Вторник — пятница, 9:00 до 21:00'}),
+      T({id:'t-bank',title:'Работа в банке',dir:'life',min:720,at:'09:00',days:[2,3,4,5],only:'A',note:'Вторник — пятница, 9:00 до 21:00'}),
+      T({id:'t-road1',title:'Дорога на работу',dir:'life',min:30,at:'08:30',days:[2,3,4,5],only:'A'}),
+      T({id:'t-road2',title:'Дорога домой',dir:'life',min:30,at:'21:00',days:[2,3,4,5],only:'A'}),
+      T({id:'t-morning',title:'Подъём, душ, завтрак',dir:'life',min:35,floor:35,at:'06:00',days:[1,2,3,4,5,6,7]}),
       T({title:'Собеседование, Альфа-банк',dir:'life',min:120,at:'12:00',date:'2026-11-09',days:[],note:'С запасом на дорогу, после собеседования день продолжается'}),
       /* --- вождение, разовые --- */
       T({title:'Вождение',dir:'pdd',min:120,at:'15:00',date:'2026-11-07',days:[]}),
-      T({title:'Вождение',dir:'pdd',min:120,at:'15:00',date:'2026-11-13',days:[]}),
       T({title:'Вождение',dir:'pdd',min:120,at:'08:00',date:'2026-11-14',days:[]}),
       T({title:'Вождение',dir:'pdd',min:120,at:'19:00',date:'2026-11-15',days:[]}),
       /* --- плавающие блоки, порядок внутри дня задаёт ord --- */
-      T({title:'Ответы и поиск клиентов',dir:'sites',min:60,minA:30,days:[1,2,3,4,5,6],core:true,ord:1,note:'Сначала ответы по переписке, потом новые адресаты'}),
-      T({title:'Android, глубокий блок',dir:'android',min:150,minA:60,days:[1,2,3,4,5,6],daysA:[1,2,3,4,5,6,7],core:true,ord:2,note:'Один большой кусок на свежую голову'}),
-      T({title:'Разработка сайта',dir:'sites',min:150,minA:150,days:[1,2,3,4],daysA:[1],core:true,ord:3}),
-      T({title:'Android, второй блок',dir:'android',min:120,minA:120,days:[3,4],daysA:[1,6,7],ord:4,note:'Практика, разбор ошибок, свой проект'}),
-      T({title:'Практика по дистанту',dir:'study',min:90,minA:60,days:[7],ord:5,note:'Задачи ТИСБИ, без привязки к парам'}),
-      T({title:'Поиск локации и референсов',dir:'content',min:60,minA:0,days:[2],ord:6}),
-      T({title:'Съёмка',dir:'content',min:90,minA:0,days:[5],ord:6}),
-      T({title:'Монтаж ролика',dir:'content',min:150,minA:120,days:[7],ord:6}),
-      T({title:'ПДД, билеты',dir:'pdd',min:60,minA:30,days:[1,2,3,4,5,6,7],core:true,ord:7}),
-      T({title:'Зал',dir:'body',min:75,minA:60,days:[2,5,7],daysA:[1,6],ord:8}),
-      T({title:'ПДД, разбор на ходу',dir:'pdd',min:40,minA:40,days:[6,7],ord:9,note:'Совмещается с залом, дорогой, кардио'}),
-      T({title:'Инстаграм: сторис, ответы, публикация',dir:'content',min:20,minA:20,days:[1,2,3,4,5,6,7],daysA:[1,6,7],ord:10})
+      T({id:'t-lunch',title:'Обед',dir:'life',min:30,minA:30,floor:30,days:[1,2,3,4,5,6,7],daysA:[1,6,7],after:'13:00',ord:0}),
+      T({id:'t-dinner',title:'Ужин',dir:'life',min:30,minA:30,floor:30,days:[1,2,3,4,5,6,7],after:'18:30',ord:0}),
+      T({id:'t-sites1',title:'Ответы и поиск клиентов',dir:'sites',min:60,minA:30,floor:30,days:[1,2,3,4,5,6],daysA:[1,2,3,4,5,6,7],core:true,ord:1,note:'Сначала ответы по переписке, потом новые адресаты'}),
+      T({id:'t-android1',title:'Android, основной блок',dir:'android',min:90,minA:60,floor:60,days:[1,2,3,4,5,6,7],daysA:[1,2,3,4,5,6,7],core:true,ord:2,note:'Первый заход на свежую голову, минимум полтора часа'}),
+      T({id:'t-sites2',title:'Разработка сайта',dir:'sites',min:150,minA:150,floor:90,days:[1,2,3,4],daysA:[1],core:true,ord:3}),
+      T({id:'t-android2',title:'Android, практика',dir:'android',min:120,minA:90,floor:90,days:[3,4,5,6],daysA:[1,6,7],ord:4,note:'Второй заход после перерыва: практика, разбор ошибок, свой проект'}),
+      T({id:'t-pract',title:'Практика по дистанту',dir:'study',min:90,minA:60,floor:60,days:[7],ord:6,note:'Задачи ТИСБИ, без привязки к парам'}),
+      T({id:'t-loc',title:'Поиск локации и референсов',dir:'content',min:60,minA:0,floor:60,days:[2],ord:7}),
+      T({id:'t-shoot',title:'Съёмка',dir:'content',min:90,minA:0,floor:60,days:[5],ord:7}),
+      T({id:'t-edit',title:'Монтаж ролика',dir:'content',min:120,minA:120,floor:120,days:[7],ord:7}),
+      T({id:'t-pdd1',title:'ПДД, билеты',dir:'pdd',min:60,minA:30,floor:30,days:[1,2,3,4,5,6,7],daysA:[1,6,7],core:true,ord:8}),
+      T({id:'t-gym',title:'Зал',dir:'body',min:90,minA:90,floor:90,days:[2,4,6],daysA:[1,6],after:'18:00',ord:10,note:'Минимум полтора часа вместе с дорогой и душем'}),
+      T({id:'t-pdd2',title:'ПДД, разбор на ходу',dir:'pdd',min:40,minA:40,floor:30,days:[2,4,6],daysA:[1,6],par:'body',ord:11,note:'Параллельно с залом: билеты между подходами, теория на кардио'}),
+      T({id:'t-pdd3',title:'ПДД, повторение в дороге',dir:'pdd',min:30,minA:30,floor:20,days:[2,3,4,5],only:'A',par:'t-road2',ord:11,note:'Параллельно с дорогой домой'}),
+      T({id:'t-insta',title:'Инстаграм: сторис, ответы, публикация',dir:'content',min:20,minA:20,floor:15,days:[1,2,3,4,5,6,7],daysA:[1,6,7],ord:12})
     ],
     log:{'2026-11-09':{done:{},skip:[],ovr:{},shape:'half'},'2026-11-14':{done:{},skip:['tisbi-sat-odd'],ovr:{},note:'вождение 8:00, пары закрыты практикой'}}, clients:[], reels:[], shield:{}, ui:{view:'day',date:t,week:monday(t),timer:null}
   };
 }
 var S=load();
 if(!S||!S.tasks){S=defaults();save()}
+/* --- перенос на новую модель дня, выполняется один раз --- */
+(function migrate(){
+  if((S.v||1)>=2)return;
+  var D=defaults(),FIELDS=['title','dir','min','minA','days','daysA','at','weeks','only','core','optional','ord','par','after','floor','note'];
+  var OLD={'Android, глубокий блок':'t-android1','Android, второй блок':'t-android2',
+           'Ответы и поиск клиентов':'t-sites1','Разработка сайта':'t-sites2','Практика по дистанту':'t-pract',
+           'Поиск локации и референсов':'t-loc','Съёмка':'t-shoot','Монтаж ролика':'t-edit',
+           'ПДД, билеты':'t-pdd1','Зал':'t-gym','ПДД, разбор на ходу':'t-pdd2',
+           'Инстаграм: сторис, ответы, публикация':'t-insta','Работа в банке':'t-bank'};
+  S.tasks.forEach(function(t){if(t.active===undefined)t.active=true});
+  /* вождение 13 ноября отменено */
+  S.tasks=S.tasks.filter(function(t){return !(t.date==='2026-11-13'&&t.title==='Вождение')});
+  D.tasks.forEach(function(ft){
+    if(ft.date)return;
+    var ex=null,i;
+    for(i=0;i<S.tasks.length;i++){
+      var t=S.tasks[i];
+      if(t.date)continue;
+      if(t.id===ft.id){ex=t;break}
+      if(OLD[t.title]===ft.id&&!t._m){ex=t;break}
+      if(t.title===ft.title&&t.at===ft.at&&!t._m){ex=t;break}
+    }
+    if(ex){ex._m=1;FIELDS.forEach(function(k){ex[k]=ft[k]})}
+    else S.tasks.push(ft);
+  });
+  S.tasks.forEach(function(t){delete t._m});
+  if(S.settings){
+    if(S.settings.wake==='07:30')S.settings.wake='06:00';
+    if(S.settings.sleep==='23:30')S.settings.sleep='23:00';
+    S.settings.norms=D.settings.norms;
+  }
+  S.v=2;save();
+})();
 if(!S.ui)S.ui={view:'day',date:todayIso(),week:monday(todayIso()),timer:null};
 S.ui.date=S.ui.date||todayIso();
 document.documentElement.setAttribute('data-theme',S.settings.theme||'dark');
@@ -374,6 +413,7 @@ document.documentElement.setAttribute('data-theme',S.settings.theme||'dark');
 function isOdd(d){var p=S.settings.parity;return (Math.abs(wserial(d)-p.serial)%2===0)?p.odd:!p.odd}
 function logOf(d){if(!S.log[d])S.log[d]={};var L=S.log[d];L.done=L.done||{};L.skip=L.skip||[];L.ovr=L.ovr||{};return L}
 var SHAPES={norm:'Обычный',focus:'Фокус',half:'Половина',easy:'Лёгкий',off:'Выходной'};
+var CUTS=[];
 
 function instances(d){
   var L=logOf(d),wd=wday(d),odd=isOdd(d),mode=S.settings.mode,out=[],i,t;
@@ -390,7 +430,8 @@ function instances(d){
     }
     var min=(mode==='A'&&typeof t.minA==='number')?t.minA:t.min;
     if(min<=0)continue;
-    var o={id:t.id,title:t.title,dir:t.dir,min:min,at:t.at,core:t.core,note:t.note,optional:t.optional,ord:t.ord||50,ref:t};
+    var o={id:t.id,title:t.title,dir:t.dir,min:min,at:t.at,core:t.core,note:t.note,optional:t.optional,
+           ord:(typeof t.ord==='number'?t.ord:50),par:t.par||null,after:t.after||null,floor:t.floor||0,ref:t};
     var ov=L.ovr[t.id]; if(ov){ if(ov.min)o.min=ov.min; if(ov.at!==undefined)o.at=ov.at; }
     out.push(o);
   }
@@ -406,31 +447,39 @@ function instances(d){
     out.forEach(function(o){if(!o.at&&o.dir===fd)ft+=o.min});
     kf=ft?Math.min(2,360/ft):1;
   }
+  CUTS=[];
   if(sh!=='norm'){
-    out=out.filter(function(o){
-      if(o.at)return true;                                   /* якоря не трогаем */
-      if(sh==='off')return o.dir==='content'&&o.min<=30;
-      return true;
-    }).map(function(o){
-      if(o.at)return o;
+    out=out.map(function(o){
+      if(o.at)return o;                                      /* якоря не трогаем */
       var k=1;
-      if(sh==='half')k=.55; else if(sh==='easy')k=.4;
+      if(sh==='half')k=.55; else if(sh==='easy')k=.4; else if(sh==='off')k=0;
       else if(sh==='focus')k=(o.dir===fd)?kf:.4;
-      o.min=Math.max(15,Math.round(o.min*k/5)*5);
-      return o;
-    });
+      var fl=o.floor||0,want=Math.round(o.min*k/5)*5;
+      if(k>=1){o.min=want;return o}
+      if(want>=fl){o.min=Math.max(15,want);return o}
+      /* короче минимума блок не бывает: либо оставляем минимум, либо убираем из дня */
+      if((o.core||o.dir==='life')&&k>0){o.min=fl||Math.max(15,want);o.cut='min';return o}
+      CUTS.push(o.title);o.min=0;return o;
+    }).filter(function(o){return o.at||o.min>0});
   }
   return out;
 }
 
 function planDay(d){
-  var L=logOf(d),items=instances(d),fixed=[],floats=[],i;
+  var L=logOf(d),items=instances(d),fixed=[],floats=[],pars=[],i;
+  var hostOf={};
+  for(i=0;i<items.length;i++){
+    if(items[i].par)continue;
+    if(L.skip.indexOf(items[i].id)>=0)continue;
+    hostOf[items[i].dir]=1;hostOf[items[i].id]=1;
+  }
   for(i=0;i<items.length;i++){
     var o=items[i];
     o.skipped=L.skip.indexOf(o.id)>=0;
     o.doneMin=L.done[o.id]||0;
     o.done=!o.skipped&&o.doneMin>=o.min-1;
-    (o.at?fixed:floats).push(o);
+    if(o.par&&hostOf[o.par]&&!o.at)pars.push(o);
+    else (o.at?fixed:floats).push(o);
   }
   fixed.sort(function(a,b){return t2m(a.at)-t2m(b.at)});
   fixed.forEach(function(o){o.s=t2m(o.at);o.e=o.s+o.min});
@@ -440,8 +489,8 @@ function planDay(d){
   }
   var busy=act.map(function(o){return {s:o.s,e:o.e}});
   var prio={sites:0,android:1,study:2,content:3,pdd:4,body:5,life:6};
-  floats.sort(function(a,b){return ((a.ord||50)-(b.ord||50))||(prio[a.dir]-prio[b.dir])||(b.min-a.min)});
-  var start=t2m(S.settings.wake)+45, end=t2m(S.settings.sleep)-30, breaks=[];
+  floats.sort(function(a,b){return ((a.ord==null?50:a.ord)-(b.ord==null?50:b.ord))||(prio[a.dir]-prio[b.dir])||(b.min-a.min)});
+  var start=t2m(S.settings.wake)+20, end=t2m(S.settings.sleep)-30, breaks=[];
   /* свободные окна между якорями */
   var mb=[],bs=busy.slice().sort(function(a,b){return a.s-b.s});
   bs.forEach(function(b){
@@ -460,10 +509,14 @@ function planDay(d){
   for(var wi=0;wi<win.length;wi++){
     cur=win[wi].s;
     var guard=0;
-    while(pend.length&&guard++<80){
-      var idx=-1;
-      for(var k2=0;k2<pend.length;k2++){if(cur+pend[k2].min<=win[wi].e){idx=k2;break}}
-      if(idx<0)break;
+    while(pend.length&&guard++<120){
+      var idx=-1,jump=null;
+      for(var k2=0;k2<pend.length;k2++){
+        var cf=pend[k2],caf=cf.after?t2m(cf.after):0;
+        if(caf>cur){ if(caf+cf.min<=win[wi].e&&(jump===null||caf<jump))jump=caf; continue; }
+        if(cur+cf.min<=win[wi].e){idx=k2;break}
+      }
+      if(idx<0){ if(jump!==null&&jump>cur){cur=jump;acc=0;continue} break; }
       var f=pend.splice(idx,1)[0];
       f.s=cur;f.e=cur+f.min;
       var gap=f.min>=90?15:10; acc+=f.min;
@@ -472,20 +525,51 @@ function planDay(d){
       cur=f.e+gap;
     }
   }
-  pend.forEach(function(f){f.over=true});
+  /* второй проход: то, что не влезло из-за «не раньше», ставим куда получится */
+  if(pend.length){
+    var free2=[],cc;
+    win.forEach(function(w){
+      var used=floats.filter(function(f){return f.s!=null&&f.s>=w.s&&f.e<=w.e});
+      cc=w.s;used.sort(function(a,b){return a.s-b.s}).forEach(function(u){
+        if(u.s-cc>=20)free2.push({s:cc,e:u.s});cc=Math.max(cc,u.e+10);});
+      if(w.e-cc>=20)free2.push({s:cc,e:w.e});
+    });
+    for(var w2=0;w2<free2.length&&pend.length;w2++){
+      var c2=free2[w2].s,g2=0;
+      while(pend.length&&g2++<40){
+        var j2=-1;
+        for(var k3=0;k3<pend.length;k3++){if(c2+pend[k3].min<=free2[w2].e){j2=k3;break}}
+        if(j2<0)break;
+        var f3=pend.splice(j2,1)[0];
+        f3.s=c2;f3.e=c2+f3.min;f3.late=true;
+        c2=f3.e+10;
+      }
+    }
+  }
+  pend.forEach(function(f){f.over=true;f.s=null;f.e=null});
+  /* параллельные блоки встают поверх своего хозяина и не занимают отдельного времени */
+  var laid=fixed.filter(function(x){return !x.skipped}).concat(floats.filter(function(f){return !f.over&&!f.skipped}));
+  pars.forEach(function(o){
+    var hs=laid.filter(function(h){return h.s!=null&&(h.dir===o.par||h.id===o.par)})
+               .sort(function(a,b){return a.s-b.s});
+    if(hs.length){o.s=hs[0].s;o.e=o.s+o.min;o.hostTitle=hs[0].title;o.parallel=true}
+    else{o.s=null;o.e=null;o.parallel=true;if(!o.skipped)o.over=true}
+  });
+  pars=pars.filter(function(o){return !o.over});
   var endAt=0;
-  floats.concat(fixed).forEach(function(o){if(o.e&&!o.skipped&&!o.over)endAt=Math.max(endAt,o.e)});
+  floats.concat(fixed).concat(pars).forEach(function(o){if(o.e&&!o.skipped&&!o.over)endAt=Math.max(endAt,o.e)});
   if(!endAt)endAt=start;
-  var all=fixed.concat(floats.filter(function(f){return !f.over}));
-  all.sort(function(a,b){return (a.s==null?9999:a.s)-(b.s==null?9999:b.s)});
-  var over=floats.filter(function(f){return f.over});
-  var planned=0,doneM=0,byDir={};
+  var all=fixed.concat(floats.filter(function(f){return !f.over})).concat(pars);
+  all.sort(function(a,b){return ((a.s==null?9999:a.s)-(b.s==null?9999:b.s))||((a.parallel?1:0)-(b.parallel?1:0))});
+  var over=floats.filter(function(f){return f.over}).concat(items.filter(function(o){return o.par&&o.over}));
+  var planned=0,doneM=0,byDir={},occupied=0;
   items.forEach(function(o){
     if(o.skipped)return;
     planned+=o.min; doneM+=Math.min(o.doneMin,o.min);
     byDir[o.dir]=(byDir[o.dir]||0)+o.min;
+    if(!o.parallel)occupied+=o.min;
   });
-  return {items:all,over:over,breaks:breaks,planned:planned,done:doneM,byDir:byDir,clash:clash,
+  return {items:all,over:over,breaks:breaks,planned:planned,done:doneM,byDir:byDir,clash:clash,occupied:occupied,cut:CUTS.slice(),
           ratio:planned?doneM/planned:0,endAt:endAt,shape:L.shape||'norm'};
 }
 
@@ -605,7 +689,7 @@ function viewDay(){
      '</div>';
 
   /* сводка */
-  var free=Math.max(0,(t2m(S.settings.sleep)-30)-(t2m(S.settings.wake)+45)-p.planned);
+  var free=Math.max(0,(t2m(S.settings.sleep)-30)-(t2m(S.settings.wake)+20)-(p.occupied||p.planned));
   h+='<div class="card"><div class="statrow">'+ring(p.ratio)+
      '<div style="flex:1;min-width:0"><div style="font-size:15px">Сделано '+hm(p.done)+' из '+hm(p.planned)+'</div>'+
      '<div class="dim" style="font-size:12.5px;margin-top:3px">Свободно '+hm(free)+' · день закрывается около '+m2t(p.endAt)+'</div>'+
@@ -616,7 +700,7 @@ function viewDay(){
      '<div class="legend">'+DKEYS.filter(function(k){return p.byDir[k]}).map(function(k){
         return '<span><i style="background:'+DIRS[k].c+'"></i>'+DIRS[k].t+' '+hmS(p.byDir[k])+'</span>';
      }).join('')+'</div></div></div>';
-  if(p.planned>600)h+='<div class="dim" style="font-size:12px;margin-top:12px;padding-top:11px;border-top:1px solid var(--line2)">Плотный день: больше 10 часов занятости. Уберите один блок или переключите день в режим «Половина», чтобы не догонять ночью.</div>';
+  if((p.occupied||p.planned)>720)h+='<div class="dim" style="font-size:12px;margin-top:12px;padding-top:11px;border-top:1px solid var(--line2)">Плотный день: больше 12 часов занятости. Уберите один блок или переключите день в режим «Половина», чтобы не догонять ночью.</div>';
   h+='</div>';
 
   /* таймлайн */
@@ -636,6 +720,7 @@ function viewDay(){
   });
   if(!shown.length)h+='<div class="dim" style="padding:22px 4px;text-align:center">Ничего не осталось. Добавьте задачу кнопкой выше.</div>';
   h+='</div></div>';
+  if(p.cut&&p.cut.length)h+='<div class="dim" style="font-size:12px;margin:12px 2px 0">Режим «'+SHAPES[p.shape]+'» убрал из дня: '+p.cut.map(function(x){return esc(x.split(',')[0])}).join(', ')+'. Эти блоки короче своего минимума не имеют смысла.</div>';
   if(hid.length){
     h+='<div class="sect"><div class="lab">Убрано из этого дня</div><div class="line"></div></div><div class="card pad0" style="padding:4px 14px">'+
       hid.map(function(o){
@@ -683,8 +768,10 @@ function itemHTML(o,d){
       '<button class="chk" data-act="toggle" data-id="'+o.id+'">'+IC.check+'</button>'+
       '<span>'+esc(o.title)+'</span>'+
       (o.at?'<span class="tag">якорь</span>':'')+
+      (o.parallel?'<span class="tag acc">'+(o.hostTitle?'вместе с: '+esc(o.hostTitle.split(',')[0].toLowerCase()):'параллельно')+'</span>':'')+
       (o.optional?'<span class="tag">можно не идти</span>':'')+
       (o.skipped?'<span class="tag warn">пропущено</span>':'')+
+      (o.cut==='min'?'<span class="tag">минимум</span>':'')+
       (o.clash?'<span class="tag warn">накладка по времени</span>':'')+
     '</div>'+
     '<div class="meta">'+DIRS[o.dir].t+' · '+hm(o.min)+(part?' · сделано '+hm(o.doneMin):'')+(run?'<span id="runclock"> · идёт</span>':'')+'</div>'+
@@ -747,9 +834,10 @@ function viewWeek(){
 /* ---------------- ЗАДАЧИ ---------------- */
 function repText(t){
   if(t.date)return 'разовая, '+dateShort(t.date);
-  if(!t.days||!t.days.length)return 'без дней';
-  if(t.days.length===7)return 'каждый день';
-  var s=t.days.map(function(n){return WDS[n-1]}).join(' ');
+  var dd=(S.settings.mode==='A'&&t.daysA)?t.daysA:t.days;
+  if(!dd||!dd.length)return 'без дней';
+  if(dd.length===7)return 'каждый день';
+  var s=dd.map(function(n){return WDS[n-1]}).join(' ');
   if(t.weeks==='odd')s+=' · нечётные недели';
   if(t.weeks==='even')s+=' · чётные недели';
   return s;
@@ -765,13 +853,18 @@ function viewTasks(){
   DKEYS.forEach(function(k){
     var list=S.tasks.filter(function(t){return t.dir===k});
     if(!list.length)return;
+    var mA=S.settings.mode==='A';
+    var wk=list.filter(function(t){return t.active&&!t.date&&(!t.only||t.only===S.settings.mode)}).reduce(function(a,t){
+      var mn=(mA&&typeof t.minA==='number')?t.minA:t.min, dy=(mA&&t.daysA)?t.daysA:(t.days||[]);
+      return a+mn*dy.length;},0);
     h+='<div class="sect"><span class="lab" style="color:'+DIRS[k].c+'">'+DIRS[k].t+'</span><div class="line"></div>'+
-       '<span class="lab">'+hmS(list.filter(function(t){return t.active&&!t.date}).reduce(function(a,t){return a+t.min*((t.days||[]).length)},0))+' / нед</span></div>';
+       '<span class="lab">'+hmS(wk)+' / нед</span></div>';
     h+='<div class="card pad0" style="padding:4px 14px">';
     list.forEach(function(t){
       h+='<div class="trow'+(t.active?'':' off')+'">'+
         '<div class="mid"><div class="nm">'+esc(t.title)+(t.core?' <span class="tag acc" style="font-size:9px">минимум</span>':'')+(t.only?' <span class="tag">режим '+t.only+'</span>':'')+'</div>'+
-        '<div class="mt">'+repText(t)+' · '+hm(t.min)+(t.at?' · '+t.at:' · плавающая')+'</div></div>'+
+        '<div class="mt">'+repText(t)+' · '+hm((S.settings.mode==='A'&&typeof t.minA==='number')?t.minA:t.min)+
+        (t.at?' · '+t.at:(t.par?' · параллельно':(t.after?' · не раньше '+t.after:' · плавающая')))+'</div></div>'+
         '<button class="sw'+(t.active?' on':'')+'" data-act="toggleTask" data-id="'+t.id+'"><i></i></button>'+
         '<button class="mini" data-act="edit" data-id="'+t.id+'">'+IC.dots+'</button></div>';
     });
@@ -905,7 +998,7 @@ function viewSet(){
     '<button class="btn sm" data-act="copyData">Скопировать текстом</button>'+
     '<button class="btn sm danger" data-act="reset">Сбросить всё</button></div>'+
     '<input type="file" id="fileIn" accept="application/json,.json" style="display:none"></div>';
-  h+='<div class="dim" style="font-size:11.5px;text-align:center;margin:18px 0 30px">devnprt.planner · сборка от 8 ноября 2026 · работает без интернета</div>';
+  h+='<div class="dim" style="font-size:11.5px;text-align:center;margin:18px 0 30px">devnprt.planner · сборка 3, ноябрь 2026 · работает без интернета</div>';
   V.innerHTML=h;
 }
 
@@ -974,15 +1067,30 @@ function sheetTask(id){
   var t=id?S.tasks.filter(function(x){return x.id===id})[0]:null;
   var nw=!t;
   t=t||T({title:'',dir:'sites',min:60,days:[1,2,3,4,5]});
+  var mA=S.settings.mode==='A';
+  var eMin=(mA&&typeof t.minA==='number')?t.minA:t.min;
+  var eDays=((mA&&t.daysA)?t.daysA:(t.days||[]));
+  var oMin=(mA?t.min:(typeof t.minA==='number'?t.minA:t.min));
+  var oDays=(mA?(t.days||[]):((t.daysA)?t.daysA:(t.days||[])));
+  var diff=(oMin!==eMin)||(oDays.join()!==eDays.join());
   var h='<h3>'+(nw?'Новая задача':'Задача')+'</h3>'+
    '<div class="f"><label>Название</label><input type="text" id="f_title" value="'+esc(t.title)+'" placeholder="Например: Android, второй блок"></div>'+
    '<div class="f"><label>Направление</label><div class="seg" id="f_dir">'+DKEYS.map(function(k){
       return '<button data-pick="dir" data-v="'+k+'" class="'+(t.dir===k?'on':'')+'">'+DIRS[k].t+'</button>'}).join('')+'</div></div>'+
-   '<div style="display:flex;gap:12px"><div class="f" style="flex:1"><label>Минут</label><input type="number" inputmode="numeric" id="f_min" value="'+t.min+'"></div>'+
+   '<div class="dim" style="font-size:11.5px;margin:-6px 0 12px">Правите режим «'+(mA?'С работой':'Полный день')+'». '+
+     (diff?'В другом режиме: '+hm(oMin)+', '+(oDays.length?oDays.map(function(x){return WDS[x-1]}).join(' '):'нет дней'):'Во втором режиме сейчас так же')+'</div>'+
+   '<div style="display:flex;gap:12px"><div class="f" style="flex:1"><label>Минут</label><input type="number" inputmode="numeric" id="f_min" value="'+eMin+'"></div>'+
    '<div class="f" style="flex:1"><label>Время</label><input type="time" id="f_at" value="'+(t.at||'')+'"></div></div>'+
    '<div class="dim" style="font-size:11.5px;margin:-8px 0 14px">Пустое время = плавающий блок, приложение само поставит его в свободное окно.</div>'+
    '<div class="f"><label>Дни недели</label><div class="days" id="f_days">'+WDS.map(function(w,i){
-      return '<button data-pick="day" data-v="'+(i+1)+'" class="'+((t.days||[]).indexOf(i+1)>=0?'on':'')+'">'+w+'</button>'}).join('')+'</div></div>'+
+      return '<button data-pick="day" data-v="'+(i+1)+'" class="'+(eDays.indexOf(i+1)>=0?'on':'')+'">'+w+'</button>'}).join('')+'</div></div>'+
+   '<div style="display:flex;gap:12px"><div class="f" style="flex:1"><label>Не раньше</label><input type="time" id="f_after" value="'+(t.after||'')+'"></div>'+
+   '<div class="f" style="flex:1"><label>Не короче, мин</label><input type="number" inputmode="numeric" id="f_floor" value="'+(t.floor||0)+'"></div></div>'+
+   '<div class="dim" style="font-size:11.5px;margin:-8px 0 14px">«Не короче» держит блок в лёгкие дни: короче этого он не станет, а если совсем не вмещается, уйдёт из дня целиком.</div>'+
+   '<div style="display:flex;gap:12px">'+
+   '<div class="f" style="flex:1"><label>Совмещается с</label><div class="seg" id="f_par">'+
+     [['','нет']].concat(DKEYS.map(function(k){return [k,DIRS[k].t]})).map(function(x){
+       return '<button data-pick="par" data-v="'+x[0]+'" class="'+(((t.par||'')===x[0])?'on':'')+'">'+x[1]+'</button>'}).join('')+'</div></div></div>'+
    '<div class="f"><label>Какие недели</label><div class="seg" id="f_weeks">'+
       [['all','Все'],['odd','Нечётные'],['even','Чётные']].map(function(x){
       return '<button data-pick="weeks" data-v="'+x[0]+'" class="'+(t.weeks===x[0]?'on':'')+'">'+x[1]+'</button>'}).join('')+'</div></div>'+
@@ -993,7 +1101,7 @@ function sheetTask(id){
    '<div class="row-btns" style="margin-top:16px"><button class="btn pri" data-act="saveTask" data-id="'+(nw?'':t.id)+'">Сохранить</button>'+
    (nw?'':'<button class="btn danger" data-act="delTask" data-id="'+t.id+'">'+(t.date?'Удалить':'Удалить из всех недель')+'</button>')+
    '<button class="btn ghost" data-act="closeSheet">Отмена</button></div>';
-  TMP={dir:t.dir,days:(t.days||[]).slice(),weeks:t.weeks,core:!!t.core};
+  TMP={dir:t.dir,days:eDays.slice(),weeks:t.weeks,core:!!t.core,par:t.par||'',mA:mA};
   openSheet(h);
 }
 var TMP={};
@@ -1042,6 +1150,7 @@ document.addEventListener('click',function(e){
     if(p==='stage'){TMP.stage=+v;el.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',+b.dataset.v===+v)})}
     if(p==='day'){var n=+v,i=TMP.days.indexOf(n);if(i<0)TMP.days.push(n);else TMP.days.splice(i,1);el.classList.toggle('on')}
     if(p==='core'){TMP.core=!TMP.core;el.classList.toggle('on')}
+    if(p==='par'){TMP.par=v;el.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.dataset.v===v)})}
     if(p==='qdone'){TMP.qdone=!TMP.qdone;el.classList.toggle('on')}
     if(p==='pmin'){var pi=document.getElementById('p_min')||document.getElementById('q_min');if(pi)pi.value=v;
       el.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.dataset.v===v)})}
@@ -1134,10 +1243,14 @@ document.addEventListener('click',function(e){
       var nt=id?S.tasks.filter(function(x){return x.id===id})[0]:T({});
       nt.title=document.getElementById('f_title').value.trim()||'Без названия';
       nt.dir=TMP.dir||'sites';
-      nt.min=parseInt(document.getElementById('f_min').value,10)||30;
+      var newMin=parseInt(document.getElementById('f_min').value,10)||30;
+      if(TMP.mA&&typeof nt.minA==='number')nt.minA=newMin; else nt.min=newMin;
       nt.at=document.getElementById('f_at').value||null;
+      nt.after=document.getElementById('f_after').value||null;
+      nt.floor=parseInt(document.getElementById('f_floor').value,10)||0;
+      nt.par=TMP.par||null;
       nt.date=document.getElementById('f_date').value||null;
-      nt.days=TMP.days.slice().sort();
+      if(TMP.mA&&nt.daysA)nt.daysA=vDays.slice(); else nt.days=vDays.slice();
       nt.weeks=TMP.weeks||'all';
       nt.core=!!TMP.core;
       nt.note=document.getElementById('f_note').value.trim();
