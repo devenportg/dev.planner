@@ -55,6 +55,7 @@ button{background:none;border:0;cursor:pointer;padding:0}
 .chip b{color:var(--fg);font-weight:500}
 .chip.acc{border-color:color-mix(in srgb,var(--acc) 45%,transparent);color:var(--acc);background:var(--accSoft)}
 .iconbtn{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);display:grid;place-items:center;color:var(--dim);background:var(--panel)}
+.iconbtn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 .iconbtn:hover{color:var(--fg)}
 
 .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;justify-content:space-around;
@@ -75,6 +76,8 @@ button{background:none;border:0;cursor:pointer;padding:0}
 .sect .line{flex:1;height:1px;background:var(--line2)}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--line);
   border-radius:11px;padding:10px 14px;font-size:13.5px;color:var(--fg);background:var(--panel);transition:.15s}
+.btn svg{width:14px;height:14px;flex:0 0 14px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.btn.pri svg{stroke-width:2}
 .btn:hover{border-color:var(--dim2)}
 .btn.pri{background:var(--acc);color:#0B0B0C;border-color:var(--acc);font-weight:500}
 html[data-theme="light"] .btn.pri{color:#fff}
@@ -185,10 +188,15 @@ html[data-theme="light"] .btn.pri{color:#fff}
 .bar2 .n{width:76px;flex:0 0 76px;color:var(--dim)}
 .bar2 .t{flex:1;height:7px;border-radius:5px;background:var(--line2);overflow:hidden}
 .bar2 .t i{display:block;height:100%;background:var(--c);opacity:.85}
-.bar2 .v{width:84px;flex:0 0 84px;text-align:right;color:var(--dim);font-size:11.5px}
+.bar2 .v{width:104px;flex:0 0 104px;text-align:right;color:var(--dim);font-size:11.5px;white-space:nowrap}
+.bar2 .v s{text-decoration:none;color:var(--dim2)}
+.bar2 .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .badge{display:flex;gap:11px;align-items:center;padding:10px 2px;border-bottom:1px solid var(--line2)}
 .badge:last-child{border-bottom:0}
-.badge .ic{width:32px;height:32px;border-radius:9px;border:1px solid var(--line);display:grid;place-items:center;font-size:14px;color:var(--dim2)}
+.badge .ic{width:34px;height:34px;flex:0 0 34px;border-radius:9px;border:1px solid var(--line);display:grid;place-items:center;
+  font-size:13px;line-height:1;letter-spacing:-.01em;color:var(--dim2);overflow:hidden;text-align:center}
+.badge .ic.l3{font-size:11px}
+.badge .ic.l4{font-size:9.5px;letter-spacing:-.03em}
 .badge.got .ic{border-color:color-mix(in srgb,var(--acc) 50%,transparent);color:var(--acc);background:var(--accSoft)}
 .badge .nm{font-size:13.5px}
 .badge.got .nm{color:var(--fg)}
@@ -539,6 +547,8 @@ function planDay(d){
   win=win.filter(function(w){return w.e-w.s>=20});
   /* укладка: в каждое окно идёт самый приоритетный блок, который туда влезает */
   var pend=floats.filter(function(f){return !f.skipped}),acc=0,cur;
+  /* уже сделанное укладываем первым: это факт, а не план */
+  pend.sort(function(a,b){return (b.done?1:0)-(a.done?1:0)});
   for(var wi=0;wi<win.length;wi++){
     cur=win[wi].s;
     var guard=0;
@@ -578,6 +588,15 @@ function planDay(d){
         c2=f3.e+10;
       }
     }
+  }
+  /* если сделанное всё равно не влезло, ставим его хвостом, но из дня не убираем */
+  if(pend.some(function(f){return f.done})){
+    var tail=start;
+    fixed.concat(floats).forEach(function(o){if(o.e&&!o.skipped&&!o.over&&o.s!=null)tail=Math.max(tail,o.e)});
+    pend.filter(function(f){return f.done}).forEach(function(f){
+      f.s=tail+10;f.e=f.s+f.min;f.late=true;tail=f.e;
+      pend.splice(pend.indexOf(f),1);
+    });
   }
   pend.forEach(function(f){f.over=true;f.s=null;f.e=null});
   /* параллельные блоки встают поверх своего хозяина и не занимают отдельного времени */
@@ -912,6 +931,7 @@ function viewTasks(){
 
 /* ---------------- ПОТОК ---------------- */
 var MKIND={job:'Отдельная работа',site:'Сайты и клиенты',other:'Другое'};
+var MSHORT={job:'Работа',site:'Сайты',other:'Другое'};
 var MKEYS=['job','site','other'];
 function rub(v){return (+v||0).toLocaleString('ru-RU')+' ₽'}
 /* весь доход одной таблицей: журнал заработка плюс оплаченные клиенты */
@@ -942,7 +962,7 @@ function viewFlow(){
     '<div class="mbar">'+MKEYS.map(function(k){var v=k==='job'?job:(k==='site'?site:oth);
       return '<div><span>'+MKIND[k]+'</span><b>'+rub(v)+'</b></div>'}).join('')+'</div></div>';
   /* ---- отдельная работа и прочий доход ---- */
-  h+='<div class="sect"><div class="lab">Отдельная работа и доход</div><div class="line"></div>'+
+  h+='<div class="sect"><div class="lab">Заработок</div><div class="line"></div>'+
      '<button class="btn sm" data-act="newmoney">'+IC.plus+' Заработок</button></div>';
   h+='<div class="card">';
   var rows=moneyRows(),rowsM=rows.filter(function(x){return (x.date||'').slice(0,7)===m});
@@ -951,9 +971,9 @@ function viewFlow(){
      (rowsM.length?' · записей в этом месяце: '+rowsM.length:'')+'</div>';
   if(!rows.length)h+='<div class="dim" style="padding:4px 2px 10px;font-size:13px">Пусто. Записывайте сюда любую работу за деньги, не только сайты: смена, халтура, подработка. Оплаты клиентов попадают сюда сами.</div>';
   rows.slice(0,14).forEach(function(x){
-    var rate=x.hours?' · '+Math.round(x.sum/x.hours).toLocaleString('ru-RU')+' ₽/ч':'';
+    var rate=x.hours?' · '+hm(x.hours*60)+' по '+Math.round(x.sum/x.hours).toLocaleString('ru-RU')+' ₽':'';
     h+='<div class="stage"><div class="mid" style="flex:1;min-width:0"><div class="nm">'+esc(x.title||'Без названия')+'</div>'+
-      '<div class="st">'+MKIND[x.kind]+(x.date?' · '+dateShort(x.date):'')+(x.hours?' · '+hm(x.hours*60):'')+rate+'</div></div>'+
+      '<div class="st">'+MSHORT[x.kind]+(x.date?' · '+dateShort(x.date):'')+rate+'</div></div>'+
       '<div style="font-size:14px;white-space:nowrap">'+rub(x.sum)+'</div>'+
       (x.src==='m'?'<button class="mini" data-act="editmoney" data-id="'+x.id+'">'+IC.dots+'</button>'
                   :'<button class="mini" data-act="editcard" data-id="'+x.id+'" data-v="c">'+IC.dots+'</button>')+'</div>';
@@ -1083,31 +1103,35 @@ function viewStat(){
      '<div><div class="lab">Деньги за месяц</div><b>'+rub(moneySum(null,t.slice(0,7)))+'</b></div>'+
      '<div><div class="lab">Отдельной работой</div><b>'+rub(moneySum('job',t.slice(0,7)))+'</b></div></div>';
   /* календарь месяца */
-  var d1=prs(mStart),days=new Date(d1.getFullYear(),d1.getMonth()+1,0).getDate(),off=wday(mStart)-1;
+  var d1=prs(mStart),days=new Date(d1.getFullYear(),d1.getMonth()+1,0).getDate(),off=wday(mStart)-1,planBy={};
   h+='<div class="sect"><div class="lab">Календарь месяца</div><div class="line"></div></div><div class="card">'+
      '<div class="heat">'+WDS.map(function(w){return '<div class="lab" style="text-align:center;letter-spacing:.06em">'+w+'</div>'}).join('');
   for(var i=0;i<off;i++)h+='<span></span>';
   for(var dd=1;dd<=days;dd++){
     var ds=mStart.slice(0,8)+pad(dd),p=planDay(ds),L=S.log[ds]||{},cls='';
+    if(ds<=t&&L.shape!=='off')for(var pk in p.byDir)planBy[pk]=(planBy[pk]||0)+p.byDir[pk];
     if(p.ratio>=.9)cls='l3';else if(p.ratio>=.6)cls='l2';else if(p.ratio>0)cls='l1';
     if(L.shield)cls+=' sh'; if(ds===t)cls+=' tdy';
     h+='<i class="'+cls+'" title="'+ds+'"></i>';
   }
   h+='</div><div class="dim" style="font-size:11.5px;margin-top:11px">Заливка — доля закрытого плана. Обводка синим — день под щитом.</div></div>';
   /* по направлениям */
+  var dayN=prs(t).getDate();
   h+='<div class="sect"><div class="lab">Часы за месяц</div><div class="line"></div></div><div class="card"><div class="bars">';
   DKEYS.forEach(function(k){
-    var v=mon[k]||0,max=Math.max.apply(null,DKEYS.map(function(x){return mon[x]||0}))||1;
-    h+='<div class="bar2"><div class="n">'+DIRS[k].t+'</div><div class="t"><i style="--c:'+DIRS[k].c+';width:'+(v/max*100)+'%"></i></div><div class="v">'+hmS(v)+'</div></div>';
+    var v=mon[k]||0,tgt=planBy[k]||0;
+    var w=tgt?Math.min(100,v/tgt*100):(v?100:0);
+    h+='<div class="bar2"><div class="n">'+DIRS[k].t+'</div><div class="t"><i style="--c:'+DIRS[k].c+';width:'+w+'%"></i></div>'+
+       '<div class="v">'+hmS(v)+(tgt?'<s> из '+hmS(tgt)+'</s>':'')+'</div></div>';
   });
-  h+='</div></div>';
+  h+='</div><div class="dim" style="font-size:11.5px;margin-top:12px">Слева сделанное, справа то, что стояло в плане с 1 по '+dayN+' число. Выходные и дни с режимом «Выходной» в план не входят.</div></div>';
   /* достижения */
   var BG=badges(),got=BG.filter(function(b){return b.g}).length;
   h+='<div class="sect"><div class="lab">Достижения</div><div class="line"></div><div class="dim" style="font-size:12px">'+got+' из '+BG.length+'</div></div>'+
      '<div class="card pad0" style="padding:4px 14px">';
   BG.forEach(function(b){
     var pc=Math.min(100,Math.round(b.c/b.t*100));
-    h+='<div class="badge'+(b.g?' got':'')+'"><div class="ic">'+b.i+'</div><div style="flex:1;min-width:0"><div class="nm">'+b.n+'</div>'+
+    h+='<div class="badge'+(b.g?' got':'')+'"><div class="ic'+(b.i.length>3?' l4':(b.i.length===3?' l3':''))+'">'+b.i+'</div><div style="flex:1;min-width:0"><div class="nm">'+b.n+'</div>'+
        '<div class="ds">'+b.d+'</div>'+
        (b.g?'':'<div class="pg"><i style="width:'+pc+'%"></i></div>')+'</div>'+
        (b.g?'<div class="bok">'+IC.check+'</div>':'<div class="bct">'+(b.t>=1000?Math.round(b.c/1000)+'к':b.c)+'/'+(b.t>=1000?Math.round(b.t/1000)+'к':b.t)+'</div>')+'</div>';
@@ -1146,7 +1170,7 @@ function viewSet(){
     '<button class="btn sm" data-act="copyData">Скопировать текстом</button>'+
     '<button class="btn sm danger" data-act="reset">Сбросить всё</button></div>'+
     '<input type="file" id="fileIn" accept="application/json,.json" style="display:none"></div>';
-  h+='<div class="dim" style="font-size:11.5px;text-align:center;margin:18px 0 30px">devnprt.planner · сборка 4, ноябрь 2026 · работает без интернета</div>';
+  h+='<div class="dim" style="font-size:11.5px;text-align:center;margin:18px 0 30px">devnprt.planner · сборка 5, ноябрь 2026 · работает без интернета</div>';
   V.innerHTML=h;
 }
 
