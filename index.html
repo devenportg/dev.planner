@@ -625,14 +625,25 @@ function viewDay(){
   h+='<div class="card pad0" style="padding:6px 13px"><div class="tl">';
   if(!p.items.length&&!p.over.length)h+='<div class="dim" style="padding:22px 4px;text-align:center">На этот день ничего не запланировано</div>';
   var nowM=(new Date()).getHours()*60+(new Date()).getMinutes(),nowShown=false;
-  p.items.forEach(function(o,idx){
+  var shown=p.items.filter(function(o){return !o.skipped});
+  var hid=p.items.concat(p.over).filter(function(o){return o.skipped});
+  shown.forEach(function(o,idx){
     if(isT&&!nowShown&&o.s!=null&&o.s>nowM){h+='<div class="nowline"><b>сейчас '+m2t(nowM)+'</b><i></i></div>';nowShown=true}
     h+=itemHTML(o,d);
     var br=p.breaks.filter(function(b){return b.s===o.e})[0];
-    if(br&&S.settings.breaks&&idx<p.items.length-1&&!o.at)
+    if(br&&S.settings.breaks&&idx<shown.length-1&&!o.at)
       h+='<div class="brk"><span>перерыв '+br.len+' мин</span><div class="l"></div></div>';
   });
+  if(!shown.length)h+='<div class="dim" style="padding:22px 4px;text-align:center">Ничего не осталось. Добавьте задачу кнопкой выше.</div>';
   h+='</div></div>';
+  if(hid.length){
+    h+='<div class="sect"><div class="lab">Убрано из этого дня</div><div class="line"></div></div><div class="card pad0" style="padding:4px 14px">'+
+      hid.map(function(o){
+        return '<div class="trow"><div class="bar" style="background:'+DIRS[o.dir].c+';width:2px;height:24px;border-radius:2px;opacity:.5"></div>'+
+          '<div class="mid"><div class="nm dim">'+esc(o.title)+'</div><div class="mt">'+DIRS[o.dir].t+' · '+hm(o.min)+'</div></div>'+
+          '<button class="btn sm" data-act="skip" data-id="'+o.id+'">Вернуть</button></div>';
+      }).join('')+'</div>';
+  }
   if(p.over.length){
     h+='<div class="sect"><div class="lab">Не помещается в день</div><div class="line"></div></div>';
     h+='<div class="card pad0" style="padding:6px 13px"><div class="tl">'+p.over.map(function(o){return itemHTML(o,d)}).join('')+'</div></div>';
@@ -894,7 +905,7 @@ function viewSet(){
     '<button class="btn sm" data-act="copyData">Скопировать текстом</button>'+
     '<button class="btn sm danger" data-act="reset">Сбросить всё</button></div>'+
     '<input type="file" id="fileIn" accept="application/json,.json" style="display:none"></div>';
-  h+='<div class="dim" style="font-size:11.5px;text-align:center;margin:18px 0 30px">devnprt.planner · автономная версия, работает без интернета</div>';
+  h+='<div class="dim" style="font-size:11.5px;text-align:center;margin:18px 0 30px">devnprt.planner · сборка от 8 ноября 2026 · работает без интернета</div>';
   V.innerHTML=h;
 }
 
@@ -942,13 +953,20 @@ function sheetMenu(id){
   var d=S.ui.date,L=logOf(d),p=planDay(d);
   var o=p.items.concat(p.over).filter(function(x){return x.id===id})[0];
   if(!o)return;
-  var h='<h3>'+esc(o.title)+'</h3><div class="menu">'+
+  var tk=S.tasks.filter(function(x){return x.id===id})[0],once=!!(tk&&tk.date);
+  var h='<h3>'+esc(o.title)+'</h3>'+
+    '<div class="dim" style="font-size:12px;margin:-9px 0 13px">'+
+      (o.virt?'Подстановка вместо пар':(once?'Разовая задача, только на '+dateShort(d):'Повторяется по шаблону недели'))+'</div>'+
+    '<div class="menu">'+
     '<button data-act="toggle" data-id="'+id+'">'+(o.done?'Снять отметку':'Отметить сделанным')+'</button>'+
     '<button data-act="part" data-id="'+id+'">Записать часть времени</button>'+
-    '<button data-act="tune" data-id="'+id+'">Изменить время и длительность на этот день</button>'+
+    '<button data-act="tune" data-id="'+id+'">Сдвинуть время или длительность, только сегодня</button>'+
     '<button data-act="tomorrow" data-id="'+id+'">Перенести на завтра</button>'+
-    '<button data-act="skip" data-id="'+id+'">'+(o.skipped?'Вернуть в день':(o.optional?'Не идти, взять практику':'Пропустить сегодня'))+'</button>'+
-    (o.virt?'':'<button data-act="edit" data-id="'+id+'">Открыть шаблон задачи</button>')+
+    (once
+      ? '<button data-act="edit" data-id="'+id+'">Изменить эту задачу</button>'+
+        '<button data-act="delTask" data-id="'+id+'" style="color:var(--warn)">Удалить задачу</button>'
+      : '<button data-act="skip" data-id="'+id+'">'+(o.skipped?'Вернуть в этот день':(o.optional?'Не идти, взять практику':'Убрать из этого дня'))+'</button>'+
+        (o.virt?'':'<button data-act="edit" data-id="'+id+'">Изменить шаблон, повлияет на все недели</button>'))+
     '</div>';
   openSheet(h);
 }
@@ -973,7 +991,7 @@ function sheetTask(id){
    '<div class="trow" style="border-bottom:0"><div class="mid"><div class="nm">Входит в минимум дня</div><div class="mt">Такие блоки держат серию</div></div>'+
    '<button class="sw'+(t.core?' on':'')+'" data-pick="core"><i></i></button></div>'+
    '<div class="row-btns" style="margin-top:16px"><button class="btn pri" data-act="saveTask" data-id="'+(nw?'':t.id)+'">Сохранить</button>'+
-   (nw?'':'<button class="btn danger" data-act="delTask" data-id="'+t.id+'">Удалить</button>')+
+   (nw?'':'<button class="btn danger" data-act="delTask" data-id="'+t.id+'">'+(t.date?'Удалить':'Удалить из всех недель')+'</button>')+
    '<button class="btn ghost" data-act="closeSheet">Отмена</button></div>';
   TMP={dir:t.dir,days:(t.days||[]).slice(),weeks:t.weeks,core:!!t.core};
   openSheet(h);
@@ -1024,7 +1042,8 @@ document.addEventListener('click',function(e){
     if(p==='stage'){TMP.stage=+v;el.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',+b.dataset.v===+v)})}
     if(p==='day'){var n=+v,i=TMP.days.indexOf(n);if(i<0)TMP.days.push(n);else TMP.days.splice(i,1);el.classList.toggle('on')}
     if(p==='core'){TMP.core=!TMP.core;el.classList.toggle('on')}
-    if(p==='pmin'){var pi=document.getElementById('p_min');if(pi)pi.value=v;
+    if(p==='qdone'){TMP.qdone=!TMP.qdone;el.classList.toggle('on')}
+    if(p==='pmin'){var pi=document.getElementById('p_min')||document.getElementById('q_min');if(pi)pi.value=v;
       el.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.dataset.v===v)})}
     return;
   }
@@ -1095,8 +1114,16 @@ document.addEventListener('click',function(e){
       S.tasks.push(T({title:oy.title,dir:oy.dir,min:oy.min-(oy.doneMin||0),at:null,days:[],date:d,note:'хвост с '+dateShort(v)}));
       var Ly=logOf(v); if(Ly.skip.indexOf(id)<0)Ly.skip.push(id);
       save(); render(); break; }
-    case 'addToday': sheetTask(null); TMP.days=[]; setTimeout(function(){var f=document.getElementById('f_date');if(f)f.value=S.ui.date;
-      document.querySelectorAll('#f_days button').forEach(function(b){b.classList.remove('on')})},0); break;
+    case 'addToday': sheetDayTask(); break;
+    case 'addDay': {
+      var qt=document.getElementById('q_title').value.trim();
+      if(!qt){toast('Напишите, что за задача');break}
+      var qm=parseInt(document.getElementById('q_min').value,10)||30;
+      var qn=T({title:qt,dir:TMP.dir||'sites',min:qm,at:document.getElementById('q_at').value||null,days:[],date:d,ord:20});
+      S.tasks.push(qn);
+      if(TMP.qdone){L=logOf(d);L.done[qn.id]=qm}
+      save(); closeSheet(); render();
+      toast(TMP.qdone?'Записал как сделанное, '+hm(qm):'Добавлено в '+dateShort(d)); break; }
     case 'newtask': sheetTask(null); break;
     case 'edit': closeSheet(); sheetTask(id); break;
     case 'toggleTask': {
@@ -1118,8 +1145,9 @@ document.addEventListener('click',function(e){
       if(!id)S.tasks.push(nt);
       save(); closeSheet(); render(); toast('Сохранено'); break; }
     case 'delTask': {
-      if(!armed(el,'Удалить насовсем?'))break;
-      var gone=S.tasks.filter(function(x){return x.id===id})[0];
+      var pre=S.tasks.filter(function(x){return x.id===id})[0];
+      if(!armed(el,(pre&&pre.date)?'Точно удалить?':'Удалить во всех днях?'))break;
+      var gone=pre;
       S.tasks=S.tasks.filter(function(x){return x.id!==id}); save(); closeSheet(); render();
       toast('Задача удалена',function(){if(gone){S.tasks.push(gone);save();render()}}); break; }
     case 'undo': { if(UNDO){var uf=UNDO;UNDO=null;
@@ -1215,6 +1243,25 @@ function sheetShape(){
     '<div class="row-btns" style="margin-top:18px"><button class="btn sm" data-act="shield">'+((S.log[S.ui.date]||{}).shield?'Снять щит':'Поставить щит на день')+'</button></div>'+
     '<div class="dim" style="font-size:12px;margin-top:9px">Щит сохраняет серию в день, когда не получилось. Два щита в месяц, осталось '+shieldsLeft()+'.</div>';
   openSheet(h);
+}
+function sheetDayTask(){
+  var d=S.ui.date;
+  TMP={dir:'sites',qdone:false};
+  openSheet('<h3>Задача на '+dateShort(d)+'</h3>'+
+    '<div class="dim" style="font-size:12.5px;margin:-8px 0 14px">Встанет только в этот день. Шаблон недели не меняется.</div>'+
+    '<div class="f"><label>Что делаю</label><input type="text" id="q_title" placeholder="Например: смета для детейлинга"></div>'+
+    '<div class="f"><label>Направление</label><div class="seg" id="f_dir">'+DKEYS.map(function(k){
+       return '<button data-pick="dir" data-v="'+k+'" class="'+(k==='sites'?'on':'')+'">'+DIRS[k].t+'</button>'}).join('')+'</div></div>'+
+    '<div class="f"><label>Сколько минут</label><div class="mins">'+[30,45,60,90,120,180].map(function(x){
+       return '<button data-pick="pmin" data-v="'+x+'">'+hm(x)+'</button>'}).join('')+'</div>'+
+    '<input type="number" inputmode="numeric" id="q_min" value="60"></div>'+
+    '<div class="f"><label>Время</label><input type="time" id="q_at"></div>'+
+    '<div class="dim" style="font-size:11.5px;margin:-8px 0 12px">Пустое время = плавающий блок, приложение само найдёт ему окно.</div>'+
+    '<div class="trow" style="border-bottom:0"><div class="mid"><div class="nm">Уже сделано</div>'+
+    '<div class="mt">Сразу засчитаю это время в день</div></div>'+
+    '<button class="sw" data-pick="qdone"><i></i></button></div>'+
+    '<div class="row-btns"><button class="btn pri" data-act="addDay">Добавить</button>'+
+    '<button class="btn ghost" data-act="closeSheet">Отмена</button></div>');
 }
 function sheetPart(id){
   var d=S.ui.date,p=planDay(d),o=p.items.concat(p.over).filter(function(x){return x.id===id})[0];
