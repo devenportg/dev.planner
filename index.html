@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#12151C">
+<title>Пульт недели</title>
+<style>
+  :root{
+    --ink:#12151C; --card:#191E28; --line:#2A3140; --fg:#F2F3F5; --dim:#8E97A6;
+    --acc:#F0961A; --ok:#4BB573; --warn:#D8694B;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  body{margin:0; background:var(--ink); color:var(--fg);
+       font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+       padding:14px 14px calc(34px + env(safe-area-inset-bottom)); max-width:720px; margin:0 auto}
+  h1{font-size:19px; margin:2px 0 2px; letter-spacing:.2px}
+  .sub{color:var(--dim); font-size:13px; margin-bottom:14px}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:12px}
+  .row{display:flex; align-items:center; gap:8px}
+  .between{justify-content:space-between}
+  .lbl{font-size:12px; letter-spacing:.8px; text-transform:uppercase; color:var(--dim); margin-bottom:9px}
+  .seg{display:flex; gap:6px; flex-wrap:wrap}
+  .seg button{flex:1 1 auto; min-width:92px; background:#131821; color:var(--dim); border:1px solid var(--line);
+    border-radius:10px; padding:9px 8px; font-size:14px; cursor:pointer}
+  .seg button.on{background:var(--acc); color:#12151C; border-color:var(--acc); font-weight:600}
+  .days{display:flex; gap:5px; margin-bottom:12px}
+  .days button{flex:1; background:var(--card); border:1px solid var(--line); border-radius:11px; color:var(--dim);
+    padding:7px 2px; font-size:12px; cursor:pointer; line-height:1.25}
+  .days button b{display:block; font-size:15px; color:var(--fg); font-weight:600}
+  .days button.on{border-color:var(--acc); background:#221A10}
+  .days button.on b{color:var(--acc)}
+  .days button.dot b::after{content:"·"; color:var(--ok); margin-left:2px}
+  .anchor{font-size:14px; color:var(--fg); background:#131821; border-left:3px solid var(--acc);
+    border-radius:0 9px 9px 0; padding:8px 11px; margin-bottom:7px}
+  .anchor.soft{border-left-color:var(--line); color:var(--dim)}
+  input[type=text]{width:100%; background:#0F131A; border:1px solid var(--line); color:var(--fg);
+    border-radius:10px; padding:11px 12px; font-size:15px; outline:none}
+  input[type=text]:focus{border-color:var(--acc)}
+  .chk{display:flex; align-items:center; gap:11px; padding:9px 0; cursor:pointer; border-bottom:1px solid #202735}
+  .chk:last-child{border-bottom:none}
+  .box{width:23px; height:23px; flex:0 0 23px; border:1.6px solid var(--line); border-radius:7px;
+    display:flex; align-items:center; justify-content:center; font-size:14px; color:transparent}
+  .chk.on .box{background:var(--ok); border-color:var(--ok); color:#0F131A}
+  .chk.on span{color:var(--dim); text-decoration:line-through}
+  .cnt{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 0}
+  .cnt .nm{font-size:14px; flex:1}
+  .cnt .nm i{display:block; font-style:normal; font-size:12px; color:var(--dim); margin-top:2px}
+  .pm{display:flex; align-items:center; gap:7px}
+  .pm button{width:34px; height:34px; border-radius:9px; border:1px solid var(--line); background:#131821;
+    color:var(--fg); font-size:18px; cursor:pointer; line-height:1}
+  .pm b{min-width:52px; text-align:center; font-size:15px; font-variant-numeric:tabular-nums}
+  .bar{height:5px; background:#202735; border-radius:4px; overflow:hidden; margin-top:3px}
+  .bar i{display:block; height:100%; background:var(--acc); border-radius:4px; transition:width .2s}
+  .bar i.full{background:var(--ok)}
+  .mini{font-size:12px; color:var(--dim)}
+  .act{display:flex; gap:8px; margin-top:4px}
+  .act button{flex:1; padding:11px; border-radius:11px; border:1px solid var(--line); background:#131821;
+    color:var(--fg); font-size:14px; cursor:pointer}
+  .act button.main{background:var(--acc); color:#12151C; border-color:var(--acc); font-weight:600}
+  textarea{width:100%; height:150px; background:#0F131A; color:var(--fg); border:1px solid var(--line);
+    border-radius:10px; padding:10px; font-size:13px; margin-top:9px; display:none}
+  .note{font-size:12px; color:var(--dim); margin-top:9px; line-height:1.5}
+  .warn{color:var(--warn)}
+  details summary{cursor:pointer; font-size:12px; letter-spacing:.8px; text-transform:uppercase; color:var(--dim); outline:none}
+  details[open] summary{color:var(--acc); margin-bottom:10px}
+  details ol{margin:0 0 4px; padding-left:20px; font-size:14px; line-height:1.55}
+  details li{margin-bottom:7px}
+  details b{color:var(--fg)}
+  details p{font-size:13px; color:var(--dim); line-height:1.55; margin:10px 0 0}
+</style>
+</head>
+<body>
+
+<h1>Пульт недели</h1>
+<div class="sub" id="sub"></div>
+
+<div class="card">
+  <div class="lbl">Сценарий</div>
+  <div class="seg" id="scen">
+    <button data-s="A">A, с банком</button>
+    <button data-s="B">B, без банка</button>
+  </div>
+</div>
+
+<div class="days" id="days"></div>
+
+<div class="card">
+  <div class="lbl" id="dayTitle">День</div>
+  <div id="anchors"></div>
+  <div class="lbl" style="margin-top:13px">Тип дня</div>
+  <div class="seg" id="dtype">
+    <button data-t="full">Полный</button>
+    <button data-t="short">Короткий</button>
+    <button data-t="off">Разгрузочный</button>
+  </div>
+  <div class="lbl" style="margin-top:13px">Главное дело дня</div>
+  <input type="text" id="main" placeholder="Одно дело, которое делает день успешным">
+</div>
+
+<div class="card">
+  <div class="lbl">Минимум дня</div>
+  <div id="minlist"></div>
+</div>
+
+<div class="card">
+  <div class="row between"><div class="lbl" style="margin:0">Нормы недели</div><div class="mini" id="weekRange"></div></div>
+  <div id="counters" style="margin-top:8px"></div>
+</div>
+
+<div class="card">
+  <div class="act">
+    <button class="main" id="copy">Скопировать отчёт</button>
+    <button id="reset">Сбросить неделю</button>
+  </div>
+  <textarea id="out" readonly></textarea>
+  <div class="note">Данные хранятся прямо в браузере этого устройства. Чтобы свести телефон и компьютер, жмите «Скопировать отчёт» и кидайте текст себе в избранное в Telegram или в таблицу на Google Drive.</div>
+</div>
+
+<div class="card">
+  <details>
+    <summary>Как этим пользоваться</summary>
+    <ol>
+      <li><b>Утром, одна минута.</b> Выберите тип дня по самочувствию и впишите одно главное дело. Если оно сделано, день засчитан.</li>
+      <li><b>В течение дня.</b> Отмечайте минимум дня и жмите плюс, когда поработали. Шаг у часов половина часа, у директа десять сообщений.</li>
+      <li><b>Вечером, одна минута.</b> Добейте галочки и посмотрите на полосы. Они считают неделю целиком, поэтому пустой вторник не страшен, если воскресенье закрывает норму.</li>
+      <li><b>В воскресенье.</b> Нажмите «Скопировать отчёт» и вставьте в таблицу на Drive или себе в избранное в Telegram. Это вся отчётность.</li>
+    </ol>
+    <p>Серые строки в дне это план по сценарию, их можно не выполнять дословно. Оранжевые это то, что назначено и не двигается.</p>
+    <p>Поставить на телефон: «Поделиться», затем «На экран Домой». На компьютере просто закрепите вкладку.</p>
+  </details>
+</div>
+
+<script>
+(function(){
+  var DN=["воскресенье","понедельник","вторник","среда","четверг","пятница","суббота"];
+  var DS=["вс","пн","вт","ср","чт","пт","сб"];
+
+  // ---- хранилище с запасным вариантом, если localStorage недоступен ----
+  var mem={};
+  var S={
+    get:function(k){ try{ return localStorage.getItem(k); }catch(e){ return mem[k]||null; } },
+    set:function(k,v){ try{ localStorage.setItem(k,v); }catch(e){ mem[k]=v; } }
+  };
+  var st=JSON.parse(S.get("planner-v1")||'{"scen":"A","days":{}}');
+  function save(){ S.set("planner-v1", JSON.stringify(st)); }
+
+  // ---- расписание ----
+  var FIXED={
+    "2026-11-07":["ТИСБИ очно","Вождение 15:00-17:00"],
+    "2026-11-09":["ТИСБИ очно","Собеседование Альфа-банк 12:00"],
+    "2026-11-13":["Вождение 15:00-17:00"],
+    "2026-11-14":["ТИСБИ очно","Вождение 08:00-10:00"],
+    "2026-11-15":["Вождение 19:00-21:00"]
+  };
+  var PLAN={
+    A:{1:["Вечер 19:00-21:00 сайты и клиенты"],
+       2:["Банк 9:00-21:00","Вечер: директ и ПДД с телефона"],
+       3:["Банк 9:00-21:00","Вечер: директ и ПДД с телефона"],
+       4:["Банк 9:00-21:00","Вечер: директ и ПДД с телефона"],
+       5:["Банк 9:00-21:00","Вечер: директ и ПДД с телефона"],
+       6:["После учёбы 16:00-19:00 сайты","Вечер: съёмка или отдых"],
+       0:["Утро зал","11:00-16:00 блок Android","17:00-19:00 сайты","Вечер разгрузка"]},
+    B:{1:["Вечер 19:00-21:00 сайты"],
+       2:["10:00-14:00 сайты","15:00 зал","Вечер контент"],
+       3:["10:00-15:00 блок Android","16:00-18:00 сайты"],
+       4:["10:00-14:00 клиентский день","15:00 зал","Вечер ПДД или вождение"],
+       5:["10:00-14:00 сайты","15:00-17:00 окно под вождение","Вечер монтаж"],
+       6:["Вождения по слотам","Вечер свободный"],
+       0:["Блок Android 5 часов или разгрузочный день","21:00 итоги недели"]}
+  };
+  var MIN=[["direct","Директ: 10 сообщений"],["inbox","Ответы на входящие до 12:00"],
+           ["pdd","ПДД 20 минут"],["sleep","Отбой до 00:00"]];
+  var NORM={
+    A:[["sites","Сайты и клиенты","ч",0.5,7],["android","Android, блоками 4-5 ч","ч",1,5],
+       ["tisbi","ТИСБИ дистант","ч",0.5,4],["msg","Директ","сообщений",10,40],
+       ["gym","Зал","раз",1,2],["reel","Ролики","шт",1,1]],
+    B:[["sites","Сайты и клиенты","ч",0.5,16],["android","Android, блоками 4-5 ч","ч",1,10],
+       ["tisbi","ТИСБИ дистант","ч",0.5,6],["msg","Директ","сообщений",10,60],
+       ["gym","Зал","раз",1,3],["reel","Ролики","шт",1,2]]
+  };
+
+  var today=new Date(); today.setHours(0,0,0,0);
+  var cur=new Date(today);
+  function key(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+  function day(d){ var k=key(d); if(!st.days[k]) st.days[k]={type:"",main:"",min:{},n:{}}; return st.days[k]; }
+  function monday(d){ var x=new Date(d); var w=(x.getDay()+6)%7; x.setDate(x.getDate()-w); return x; }
+  function weekSum(code){
+    var m=monday(cur), s=0;
+    for(var i=0;i<7;i++){ var x=new Date(m); x.setDate(m.getDate()+i);
+      var r=st.days[key(x)]; if(r&&r.n&&r.n[code]) s+=r.n[code]; }
+    return Math.round(s*10)/10;
+  }
+
+  function el(h){ var t=document.createElement("div"); t.innerHTML=h.trim(); return t.firstChild; }
+
+  function render(){
+    document.getElementById("sub").textContent =
+      "Сегодня " + today.getDate() + "." + String(today.getMonth()+1).padStart(2,"0") + ", " + DN[today.getDay()] +
+      ". Нормы считаются за неделю, а не за день.";
+
+    // сценарий
+    [].forEach.call(document.querySelectorAll("#scen button"), function(b){
+      b.className = (b.dataset.s===st.scen) ? "on" : ""; });
+
+    // полоса дней
+    var m=monday(cur), html="";
+    for(var i=0;i<7;i++){
+      var x=new Date(m); x.setDate(m.getDate()+i);
+      var k=key(x), r=st.days[k];
+      var done = r && (r.type==="off" || (r.main && r.min && Object.keys(r.min).filter(function(q){return r.min[q];}).length>=3));
+      html += '<button data-i="'+i+'" class="'+(k===key(cur)?"on ":"")+(done?"dot":"")+'"><b>'+x.getDate()+'</b>'+DS[x.getDay()]+'</button>';
+    }
+    document.getElementById("days").innerHTML=html;
+    [].forEach.call(document.querySelectorAll("#days button"), function(b){
+      b.onclick=function(){ var x=new Date(monday(cur)); x.setDate(x.getDate()+ +b.dataset.i); cur=x; render(); }; });
+
+    var rec=day(cur), k=key(cur);
+    document.getElementById("dayTitle").textContent =
+      DN[cur.getDay()] + ", " + cur.getDate() + "." + String(cur.getMonth()+1).padStart(2,"0") +
+      (k===key(today) ? " · сегодня" : "");
+
+    // якоря
+    var a=document.getElementById("anchors"); a.innerHTML="";
+    (FIXED[k]||[]).forEach(function(t){ a.appendChild(el('<div class="anchor">'+t+'</div>')); });
+    if(!FIXED[k] && (cur.getDay()===1||cur.getDay()===6)) a.appendChild(el('<div class="anchor">ТИСБИ очно</div>'));
+    (PLAN[st.scen][cur.getDay()]||[]).forEach(function(t){ a.appendChild(el('<div class="anchor soft">'+t+'</div>')); });
+
+    // тип дня
+    [].forEach.call(document.querySelectorAll("#dtype button"), function(b){
+      b.className = (b.dataset.t===rec.type) ? "on" : "";
+      b.onclick=function(){ rec.type = (rec.type===b.dataset.t ? "" : b.dataset.t); save(); render(); }; });
+
+    var inp=document.getElementById("main");
+    inp.value=rec.main||"";
+    inp.oninput=function(){ rec.main=inp.value; save(); };
+
+    // минимум дня
+    var ml=document.getElementById("minlist"); ml.innerHTML="";
+    MIN.forEach(function(p){
+      var on=!!(rec.min&&rec.min[p[0]]);
+      var n=el('<div class="chk'+(on?" on":"")+'"><div class="box">✓</div><span>'+p[1]+'</span></div>');
+      n.onclick=function(){ rec.min[p[0]]=!rec.min[p[0]]; save(); render(); };
+      ml.appendChild(n);
+    });
+
+    // нормы
+    var mEnd=new Date(m); mEnd.setDate(m.getDate()+6);
+    document.getElementById("weekRange").textContent =
+      m.getDate()+"."+String(m.getMonth()+1).padStart(2,"0")+" - "+mEnd.getDate()+"."+String(mEnd.getMonth()+1).padStart(2,"0");
+    var c=document.getElementById("counters"); c.innerHTML="";
+    NORM[st.scen].forEach(function(p){
+      var code=p[0], nm=p[1], unit=p[2], step=p[3], goal=p[4];
+      var w=weekSum(code), d=(rec.n&&rec.n[code])||0, pct=Math.min(100, Math.round(w/goal*100));
+      var n=el(
+        '<div><div class="cnt"><div class="nm">'+nm+
+        '<i>за неделю '+w+' из '+goal+' '+unit+'</i></div>'+
+        '<div class="pm"><button data-a="-">−</button><b>'+d+'</b><button data-a="+">+</button></div></div>'+
+        '<div class="bar"><i class="'+(pct>=100?"full":"")+'" style="width:'+pct+'%"></i></div></div>');
+      [].forEach.call(n.querySelectorAll("button"), function(b){
+        b.onclick=function(){
+          var v=((rec.n&&rec.n[code])||0) + (b.dataset.a==="+"?step:-step);
+          rec.n[code]=Math.max(0, Math.round(v*10)/10); save(); render();
+        }; });
+      c.appendChild(n);
+    });
+  }
+
+  [].forEach.call(document.querySelectorAll("#scen button"), function(b){
+    b.onclick=function(){ st.scen=b.dataset.s; save(); render(); }; });
+
+  document.getElementById("copy").onclick=function(){
+    var m=monday(cur), lines=["Неделя "+m.getDate()+"."+(m.getMonth()+1)+", сценарий "+st.scen,""];
+    NORM[st.scen].forEach(function(p){ lines.push(p[1]+": "+weekSum(p[0])+" из "+p[4]+" "+p[2]); });
+    lines.push("");
+    for(var i=0;i<7;i++){
+      var x=new Date(m); x.setDate(m.getDate()+i); var r=st.days[key(x)];
+      if(r&&(r.main||r.type)) lines.push(DS[x.getDay()]+" "+x.getDate()+": "+(r.main||"без главного дела")+
+        (r.type? " ["+({full:"полный",short:"короткий",off:"разгрузка"})[r.type]+"]":""));
+    }
+    var txt=lines.join("\n"), out=document.getElementById("out");
+    out.value=txt; out.style.display="block"; out.select();
+    try{ navigator.clipboard.writeText(txt); }catch(e){ try{ document.execCommand("copy"); }catch(e2){} }
+  };
+  document.getElementById("reset").onclick=function(){
+    if(!confirm("Очистить данные этой недели?")) return;
+    var m=monday(cur);
+    for(var i=0;i<7;i++){ var x=new Date(m); x.setDate(m.getDate()+i); delete st.days[key(x)]; }
+    save(); render();
+  };
+
+  render();
+})();
+</script>
+</body>
+</html>
