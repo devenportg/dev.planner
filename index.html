@@ -207,10 +207,10 @@ html[data-theme="light"] .btn.pri{color:#fff}
 .badge .bct{font-size:11px;color:var(--dim2);white-space:nowrap;font-variant-numeric:tabular-nums}
 .badge .bok{width:18px;height:18px;color:var(--acc);flex:0 0 auto}
 .badge .bok svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2}
-.mbar{display:flex;gap:1px;margin:12px -14px -14px;background:var(--line2);border-top:1px solid var(--line2)}
-.mbar>div{flex:1;background:var(--card);padding:10px 12px;min-width:0}
+.mbar{display:flex;gap:1px;margin:15px 0 0;background:var(--line2);border-radius:var(--rs);overflow:hidden}
+.mbar>div{flex:1;background:var(--panel2);padding:10px 11px;min-width:0;overflow:hidden}
 .mbar span{display:block;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim2);line-height:1.3;min-height:26px}
-.mbar b{font-size:13.5px;font-weight:400;display:block;margin-top:3px;white-space:nowrap}
+.mbar b{font-size:13.5px;font-weight:400;display:block;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* forms */
 .f{display:flex;flex-direction:column;gap:5px;margin-bottom:13px}
@@ -322,6 +322,9 @@ var monday=function(s){return addD(s,1-wday(s))};
 var wserial=function(s){return Math.round((prs(monday(s))-prs('2024-01-01'))/6048e5)};
 var t2m=function(t){var a=t.split(':');return (+a[0])*60+(+a[1])};
 var m2t=function(m){m=((m%1440)+1440)%1440;return pad(Math.floor(m/60))+':'+pad(m%60)};
+/* отбой после полуночи относится к этим же суткам: 00:30 это конец дня, а не его начало */
+var dayStart=function(){return t2m(S.settings.wake)};
+var dayEnd=function(){var w=t2m(S.settings.wake),e=t2m(S.settings.sleep);if(e<=w)e+=1440;return e-30};
 var hm=function(m){if(m<=0)return '0 мин';var h=Math.floor(m/60),x=m%60;return (h?h+' ч':'')+(h&&x?' ':'')+(x?x+' мин':'')};
 var hmS=function(m){var h=m/60;return (Math.round(h*10)/10).toString().replace('.',',')+' ч'};
 var MONTH=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
@@ -531,7 +534,7 @@ function planDay(d){
   var busy=act.map(function(o){return {s:o.s,e:o.e}});
   var prio={sites:0,android:1,study:2,content:3,pdd:4,body:5,life:6};
   floats.sort(function(a,b){return ((a.ord==null?50:a.ord)-(b.ord==null?50:b.ord))||(prio[a.dir]-prio[b.dir])||(b.min-a.min)});
-  var start=t2m(S.settings.wake)+20, end=t2m(S.settings.sleep)-30, breaks=[];
+  var start=dayStart(), end=dayEnd(), breaks=[];
   /* свободные окна между якорями */
   var mb=[],bs=busy.slice().sort(function(a,b){return a.s-b.s});
   bs.forEach(function(b){
@@ -540,7 +543,7 @@ function planDay(d){
   });
   var win=[],c=start;
   mb.forEach(function(b){
-    if(b.s>c&&b.s<end)win.push({s:c,e:Math.min(b.s,end)});
+    if(b.s>c&&c<end)win.push({s:c,e:Math.min(b.s,end)});
     c=Math.max(c,b.e+15);
   });
   if(c<end)win.push({s:c,e:end});
@@ -613,6 +616,17 @@ function planDay(d){
   pars=pars.filter(function(o){return !o.over});
   var endAt=0;
   floats.concat(fixed).concat(pars).forEach(function(o){if(o.e&&!o.skipped&&!o.over)endAt=Math.max(endAt,o.e)});
+  /* сколько времени в сутках реально осталось и какой самый длинный свободный промежуток */
+  var clamp=function(x){return Math.max(start,Math.min(x,end))};
+  var occB=fixed.concat(floats).filter(function(o){return !o.skipped&&!o.over&&o.s!=null&&!o.parallel})
+                .map(function(o){return {s:clamp(o.s),e:clamp(o.e)}}).sort(function(a,b){return a.s-b.s});
+  var mg=[],freeMin=0,gapMax=0,cc2=start;
+  occB.forEach(function(b){var l=mg[mg.length-1];if(l&&b.s<=l.e)l.e=Math.max(l.e,b.e);else mg.push({s:b.s,e:b.e})});
+  mg.concat([{s:end,e:end}]).forEach(function(b){
+    var g=Math.min(b.s,end)-cc2;
+    if(g>0){freeMin+=g;if(g>gapMax)gapMax=g}
+    cc2=Math.max(cc2,b.e);
+  });
   if(!endAt)endAt=start;
   var all=fixed.concat(floats.filter(function(f){return !f.over})).concat(pars);
   all.sort(function(a,b){return ((a.s==null?9999:a.s)-(b.s==null?9999:b.s))||((a.parallel?1:0)-(b.parallel?1:0))});
@@ -625,7 +639,8 @@ function planDay(d){
     if(!o.parallel)occupied+=o.min;
   });
   return {items:all,over:over,breaks:breaks,planned:planned,done:doneM,byDir:byDir,clash:clash,occupied:occupied,cut:CUTS.slice(),
-          ratio:planned?doneM/planned:0,endAt:endAt,shape:L.shape||'norm'};
+          ratio:planned?doneM/planned:0,endAt:endAt,shape:L.shape||'norm',
+          winMin:Math.max(0,end-start),freeMin:Math.max(0,freeMin),gapMax:Math.max(0,gapMax)};
 }
 
 /* ---- оценка дня, серия, уровни ---- */
@@ -736,6 +751,7 @@ function viewDay(){
      '<button class="chip'+(wday(d)===6||wday(d)===1?' acc':'')+'" data-act="parity">Неделя <b>'+(isOdd(d)?'нечётная':'чётная')+'</b></button>'+
      '<button class="chip" data-act="shape">Режим дня <b>'+SHAPES[p.shape]+(p.shape==='focus'?': '+DIRS[L.focus||'android'].t:'')+'</b></button>'+
      (p.over.length?'<span class="chip" style="color:var(--warn)">Не вмещается: <b>'+p.over.length+'</b></span>':'')+
+     (p.winMin<300?'<span class="chip" style="color:var(--warn)">От подъёма до отбоя всего '+hm(p.winMin)+' <button data-act="go" data-v="set" style="color:var(--acc);margin-left:5px">настройки</button></span>':'')+
      (p.clash.length?p.clash.map(function(c){
         var opt=c[0].optional?c[0]:(c[1].optional?c[1]:null);
         return '<span class="chip" style="color:var(--warn)">Накладка: <b>'+esc(c[0].title.split(',')[0])+' и '+esc(c[1].title.split(',')[0])+'</b>'+
@@ -744,7 +760,7 @@ function viewDay(){
      '</div>';
 
   /* сводка */
-  var free=Math.max(0,(t2m(S.settings.sleep)-30)-(t2m(S.settings.wake)+20)-(p.occupied||p.planned));
+  var free=(p.freeMin!=null)?p.freeMin:Math.max(0,dayEnd()-dayStart()-(p.occupied||p.planned));
   h+='<div class="card"><div class="statrow">'+ring(p.ratio)+
      '<div style="flex:1;min-width:0"><div style="font-size:15px">Сделано '+hm(p.done)+' из '+hm(p.planned)+'</div>'+
      '<div class="dim" style="font-size:12.5px;margin-top:3px">Свободно '+hm(free)+' · день закрывается около '+m2t(p.endAt)+'</div>'+
@@ -786,6 +802,9 @@ function viewDay(){
   }
   if(p.over.length){
     h+='<div class="sect"><div class="lab">Не помещается в день</div><div class="line"></div></div>';
+    h+='<div class="dim" style="font-size:12px;margin:-4px 0 10px;line-height:1.5">Свободно в сутках '+hm(p.freeMin||0)+
+       ', самый длинный промежуток '+hm(p.gapMax||0)+'. Блок встаёт только целиком, поэтому короткий промежуток его не берёт. '+
+       'Можно укоротить блок, сдвинуть якорь или перенести дело на завтра.</div>';
     h+='<div class="card pad0" style="padding:6px 13px"><div class="tl">'+p.over.map(function(o){return itemHTML(o,d)}).join('')+'</div></div>';
   }
   /* хвосты вчера */
@@ -957,7 +976,7 @@ function viewFlow(){
   var sum=moneySum(null,m),job=moneySum('job',m),site=moneySum('site',m),oth=moneySum('other',m);
   var h='<div class="dayhead"><div><div class="lab">Деньги и контент</div><h1 class="h1" style="margin-top:2px">Поток</h1></div></div>';
   h+='<div class="card"><div class="statrow">'+ring(Math.min(1,sum/(S.settings.goal||1)))+
-    '<div style="flex:1"><div style="font-size:15px">'+rub(sum)+' за '+MONTHN[prs(todayIso()).getMonth()].toLowerCase()+'</div>'+
+    '<div style="flex:1;min-width:0"><div style="font-size:15px">'+rub(sum)+' за '+MONTHN[prs(todayIso()).getMonth()].toLowerCase()+'</div>'+
     '<div class="dim" style="font-size:12.5px;margin-top:3px">Цель месяца '+rub(S.settings.goal||0)+' · закрыто '+Math.round(sum/(S.settings.goal||1)*100)+'%</div></div></div>'+
     '<div class="mbar">'+MKEYS.map(function(k){var v=k==='job'?job:(k==='site'?site:oth);
       return '<div><span>'+MKIND[k]+'</span><b>'+rub(v)+'</b></div>'}).join('')+'</div></div>';
@@ -1009,7 +1028,7 @@ function viewFlow(){
 
 /* ---------------- ПРОГРЕСС ---------------- */
 /* сводка по всей истории, одним проходом */
-function history(){
+function achStats(){
   var r={days:0,big:0,huge:0,full:0,gym:0,drive:0,early:0,best:0,streakBest:(S.streak&&S.streak.best)||0,dir:{}};
   var ttl={};S.tasks.forEach(function(t){ttl[t.id]=t.title||''});
   for(var d in S.log){
@@ -1032,7 +1051,7 @@ function history(){
   return r;
 }
 function badges(){
-  var H=history(),st=streak(),th=totalMin()/60;
+  var H=achStats(),st=streak(),th=totalMin()/60;
   var paid=S.clients.filter(function(c){return c.stage===4}).length;
   var reels=S.reels.filter(function(r){return r.stage>=4}).length;
   var h=function(k){return (H.dir[k]||0)/60};
@@ -1170,7 +1189,7 @@ function viewSet(){
     '<button class="btn sm" data-act="copyData">Скопировать текстом</button>'+
     '<button class="btn sm danger" data-act="reset">Сбросить всё</button></div>'+
     '<input type="file" id="fileIn" accept="application/json,.json" style="display:none"></div>';
-  h+='<div class="dim" style="font-size:11.5px;text-align:center;margin:18px 0 30px">devnprt.planner · сборка 5, ноябрь 2026 · работает без интернета</div>';
+  h+='<div class="dim" style="font-size:11.5px;text-align:center;margin:18px 0 30px">devnprt.planner · сборка 6, ноябрь 2026 · работает без интернета</div>';
   V.innerHTML=h;
 }
 
