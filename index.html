@@ -194,6 +194,15 @@ html[data-theme="light"] .btn.pri{color:#fff}
 .badge.got .nm{color:var(--fg)}
 .badge:not(.got) .nm{color:var(--dim)}
 .badge .ds{font-size:11.5px;color:var(--dim2)}
+.badge .pg{height:3px;border-radius:2px;background:var(--line2);margin-top:6px;max-width:190px;overflow:hidden}
+.badge .pg i{display:block;height:100%;background:var(--dim2);border-radius:2px}
+.badge .bct{font-size:11px;color:var(--dim2);white-space:nowrap;font-variant-numeric:tabular-nums}
+.badge .bok{width:18px;height:18px;color:var(--acc);flex:0 0 auto}
+.badge .bok svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2}
+.mbar{display:flex;gap:1px;margin:12px -14px -14px;background:var(--line2);border-top:1px solid var(--line2)}
+.mbar>div{flex:1;background:var(--card);padding:10px 12px;min-width:0}
+.mbar span{display:block;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim2);line-height:1.3;min-height:26px}
+.mbar b{font-size:13.5px;font-weight:400;display:block;margin-top:3px;white-space:nowrap}
 
 /* forms */
 .f{display:flex;flex-direction:column;gap:5px;margin-bottom:13px}
@@ -367,7 +376,7 @@ function defaults(){
       T({id:'t-pdd3',title:'ПДД, повторение в дороге',dir:'pdd',min:30,minA:30,floor:20,days:[2,3,4,5],only:'A',par:'t-road2',ord:11,note:'Параллельно с дорогой домой'}),
       T({id:'t-insta',title:'Инстаграм: сторис, ответы, публикация',dir:'content',min:20,minA:20,floor:15,days:[1,2,3,4,5,6,7],daysA:[1,6,7],ord:12})
     ],
-    log:{'2026-11-09':{done:{},skip:[],ovr:{},shape:'half'},'2026-11-14':{done:{},skip:['tisbi-sat-odd'],ovr:{},note:'вождение 8:00, пары закрыты практикой'}}, clients:[], reels:[], shield:{}, ui:{view:'day',date:t,week:monday(t),timer:null}
+    log:{'2026-11-09':{done:{},skip:[],ovr:{},shape:'half'},'2026-11-14':{done:{},skip:['tisbi-sat-odd'],ovr:{},note:'вождение 8:00, пары закрыты практикой'}}, clients:[], reels:[], income:[], shield:{}, ui:{view:'day',date:t,week:monday(t),timer:null}
   };
 }
 var S=load();
@@ -405,6 +414,7 @@ if(!S||!S.tasks){S=defaults();save()}
   }
   S.v=2;save();
 })();
+if(!Array.isArray(S.income)){S.income=[];S.v=3;save()}
 if(!S.ui)S.ui={view:'day',date:todayIso(),week:monday(todayIso()),timer:null};
 S.ui.date=S.ui.date||todayIso();
 document.documentElement.setAttribute('data-theme',S.settings.theme||'dark');
@@ -467,25 +477,48 @@ function instances(d){
 
 function planDay(d){
   var L=logOf(d),items=instances(d),fixed=[],floats=[],pars=[],i;
-  var hostOf={};
-  for(i=0;i<items.length;i++){
-    if(items[i].par)continue;
-    if(L.skip.indexOf(items[i].id)>=0)continue;
-    hostOf[items[i].dir]=1;hostOf[items[i].id]=1;
-  }
+  /* ---- совмещение дел: ищем хозяина, рвём взаимные ссылки и цепочки ---- */
+  var alive=items.filter(function(x){return L.skip.indexOf(x.id)<0}),pick={};
+  alive.forEach(function(o){
+    if(!o.par)return;
+    var cs=alive.filter(function(h){return h!==o&&(h.id===o.par||h.dir===o.par)});
+    var back=function(h){return !!(h.par&&(h.par===o.id||h.par===o.dir))};
+    cs.sort(function(a,b){return ((back(b)?1:0)-(back(a)?1:0))||((a.par?1:0)-(b.par?1:0))||(b.min-a.min)});
+    pick[o.id]=cs[0]||null;
+  });
+  /* длинный блок не подстраивается под короткий: пара разворачивается */
+  alive.forEach(function(o){
+    var h=pick[o.id];
+    if(!o.par||!h||h.min>=o.min)return;
+    o.solo=true;
+    if(!h.par||pick[h.id]===o){h.par=h.par||o.id;pick[h.id]=o}
+  });
+  alive.forEach(function(o){
+    if(!o.par||!pick[o.id])return;
+    var seen=[],cur=o,g=0;
+    while(cur&&cur.par&&pick[cur.id]&&!cur.solo&&g++<8){
+      if(seen.indexOf(cur)>=0){
+        var cyc=seen.slice(seen.indexOf(cur));
+        cyc.sort(function(a,b){return (b.min-a.min)||((a.ord==null?50:a.ord)-(b.ord==null?50:b.ord))||(a.id<b.id?-1:1)});
+        cyc[0].solo=true;break;
+      }
+      seen.push(cur);cur=pick[cur.id];
+    }
+  });
   for(i=0;i<items.length;i++){
     var o=items[i];
     o.skipped=L.skip.indexOf(o.id)>=0;
     o.doneMin=L.done[o.id]||0;
     o.done=!o.skipped&&o.doneMin>=o.min-1;
-    if(o.par&&hostOf[o.par]&&!o.at)pars.push(o);
+    if(o.par&&!o.solo&&pick[o.id]&&!o.skipped)pars.push(o);
     else (o.at?fixed:floats).push(o);
   }
   fixed.sort(function(a,b){return t2m(a.at)-t2m(b.at)});
   fixed.forEach(function(o){o.s=t2m(o.at);o.e=o.s+o.min});
   var act=fixed.filter(function(o){return !o.skipped}),clash=[];
+  var linked=function(a,b){return !!((a.par&&(a.par===b.id||a.par===b.dir))||(b.par&&(b.par===a.id||b.par===a.dir)))};
   for(i=1;i<act.length;i++){
-    if(act[i].s<act[i-1].e){act[i].clash=true;act[i-1].clash=true;clash.push([act[i-1],act[i]])}
+    if(act[i].s<act[i-1].e&&!linked(act[i],act[i-1])){act[i].clash=true;act[i-1].clash=true;clash.push([act[i-1],act[i]])}
   }
   var busy=act.map(function(o){return {s:o.s,e:o.e}});
   var prio={sites:0,android:1,study:2,content:3,pdd:4,body:5,life:6};
@@ -548,13 +581,16 @@ function planDay(d){
   }
   pend.forEach(function(f){f.over=true;f.s=null;f.e=null});
   /* параллельные блоки встают поверх своего хозяина и не занимают отдельного времени */
-  var laid=fixed.filter(function(x){return !x.skipped}).concat(floats.filter(function(f){return !f.over&&!f.skipped}));
-  pars.forEach(function(o){
-    var hs=laid.filter(function(h){return h.s!=null&&(h.dir===o.par||h.id===o.par)})
-               .sort(function(a,b){return a.s-b.s});
-    if(hs.length){o.s=hs[0].s;o.e=o.s+o.min;o.hostTitle=hs[0].title;o.parallel=true}
-    else{o.s=null;o.e=null;o.parallel=true;if(!o.skipped)o.over=true}
-  });
+  var pass=0,moved=true;
+  while(moved&&pass++<5){
+    moved=false;
+    pars.forEach(function(o){
+      if(o.s!=null)return;
+      var h=pick[o.id];
+      if(h&&h.s!=null&&!h.over){o.s=h.s;o.e=o.s+o.min;o.hostTitle=h.title;o.parallel=true;moved=true}
+    });
+  }
+  pars.forEach(function(o){o.parallel=true;if(o.s==null)o.over=true});
   pars=pars.filter(function(o){return !o.over});
   var endAt=0;
   floats.concat(fixed).concat(pars).forEach(function(o){if(o.e&&!o.skipped&&!o.over)endAt=Math.max(endAt,o.e)});
@@ -875,16 +911,55 @@ function viewTasks(){
 }
 
 /* ---------------- ПОТОК ---------------- */
+var MKIND={job:'Отдельная работа',site:'Сайты и клиенты',other:'Другое'};
+var MKEYS=['job','site','other'];
+function rub(v){return (+v||0).toLocaleString('ru-RU')+' ₽'}
+/* весь доход одной таблицей: журнал заработка плюс оплаченные клиенты */
+function moneyRows(){
+  var r=S.income.map(function(x){return {id:x.id,title:x.title,kind:x.kind||'job',sum:+x.sum||0,date:x.date||'',hours:+x.hours||0,src:'m'}});
+  S.clients.forEach(function(c){
+    if(c.stage===4&&+c.sum)r.push({id:c.id,title:c.name,kind:'site',sum:+c.sum,date:c.paidAt||'',hours:0,src:'c'});
+  });
+  return r.sort(function(a,b){return a.date<b.date?1:-1});
+}
+function moneySum(kind,from){
+  return moneyRows().reduce(function(a,x){
+    if(kind&&x.kind!==kind)return a;
+    if(from&&(x.date||'').slice(0,from.length)!==from)return a;
+    return a+x.sum;
+  },0);
+}
 var CL=['Лид','Написал','Диалог','Созвон','Оплата'];
 var RL=['Идея','Локация','Снято','Монтаж','Вышло'];
 function viewFlow(){
   var m=todayIso().slice(0,7);
   var paid=S.clients.filter(function(c){return c.stage===4&&(c.paidAt||'').slice(0,7)===m});
-  var sum=paid.reduce(function(a,c){return a+(+c.sum||0)},0);
+  var sum=moneySum(null,m),job=moneySum('job',m),site=moneySum('site',m),oth=moneySum('other',m);
   var h='<div class="dayhead"><div><div class="lab">Деньги и контент</div><h1 class="h1" style="margin-top:2px">Поток</h1></div></div>';
   h+='<div class="card"><div class="statrow">'+ring(Math.min(1,sum/(S.settings.goal||1)))+
-    '<div style="flex:1"><div style="font-size:15px">'+sum.toLocaleString('ru-RU')+' ₽ за '+MONTHN[prs(todayIso()).getMonth()].toLowerCase()+'</div>'+
-    '<div class="dim" style="font-size:12.5px;margin-top:3px">Цель месяца '+(S.settings.goal||0).toLocaleString('ru-RU')+' ₽ · оплат: '+paid.length+'</div></div></div></div>';
+    '<div style="flex:1"><div style="font-size:15px">'+rub(sum)+' за '+MONTHN[prs(todayIso()).getMonth()].toLowerCase()+'</div>'+
+    '<div class="dim" style="font-size:12.5px;margin-top:3px">Цель месяца '+rub(S.settings.goal||0)+' · закрыто '+Math.round(sum/(S.settings.goal||1)*100)+'%</div></div></div>'+
+    '<div class="mbar">'+MKEYS.map(function(k){var v=k==='job'?job:(k==='site'?site:oth);
+      return '<div><span>'+MKIND[k]+'</span><b>'+rub(v)+'</b></div>'}).join('')+'</div></div>';
+  /* ---- отдельная работа и прочий доход ---- */
+  h+='<div class="sect"><div class="lab">Отдельная работа и доход</div><div class="line"></div>'+
+     '<button class="btn sm" data-act="newmoney">'+IC.plus+' Заработок</button></div>';
+  h+='<div class="card">';
+  var rows=moneyRows(),rowsM=rows.filter(function(x){return (x.date||'').slice(0,7)===m});
+  h+='<div class="dim" style="font-size:12px;padding:2px 2px 10px;line-height:1.5">За всё время '+rub(moneySum())+
+     ', из них отдельной работой '+rub(moneySum('job'))+
+     (rowsM.length?' · записей в этом месяце: '+rowsM.length:'')+'</div>';
+  if(!rows.length)h+='<div class="dim" style="padding:4px 2px 10px;font-size:13px">Пусто. Записывайте сюда любую работу за деньги, не только сайты: смена, халтура, подработка. Оплаты клиентов попадают сюда сами.</div>';
+  rows.slice(0,14).forEach(function(x){
+    var rate=x.hours?' · '+Math.round(x.sum/x.hours).toLocaleString('ru-RU')+' ₽/ч':'';
+    h+='<div class="stage"><div class="mid" style="flex:1;min-width:0"><div class="nm">'+esc(x.title||'Без названия')+'</div>'+
+      '<div class="st">'+MKIND[x.kind]+(x.date?' · '+dateShort(x.date):'')+(x.hours?' · '+hm(x.hours*60):'')+rate+'</div></div>'+
+      '<div style="font-size:14px;white-space:nowrap">'+rub(x.sum)+'</div>'+
+      (x.src==='m'?'<button class="mini" data-act="editmoney" data-id="'+x.id+'">'+IC.dots+'</button>'
+                  :'<button class="mini" data-act="editcard" data-id="'+x.id+'" data-v="c">'+IC.dots+'</button>')+'</div>';
+  });
+  if(rows.length>14)h+='<div class="dim" style="font-size:11.5px;padding:8px 2px 0">Показаны последние 14 записей из '+rows.length+'.</div>';
+  h+='</div>';
   h+='<div class="sect"><div class="lab">Клиенты</div><div class="line"></div><button class="btn sm" data-act="newcard" data-v="c">'+IC.plus+' Клиент</button></div>';
   h+='<div class="card"><div class="sbar">'+CL.map(function(n,i){
       return '<div>'+n+'<b>'+S.clients.filter(function(c){return c.stage===i}).length+'</b></div>'}).join('')+'</div>';
@@ -913,20 +988,85 @@ function viewFlow(){
 }
 
 /* ---------------- ПРОГРЕСС ---------------- */
+/* сводка по всей истории, одним проходом */
+function history(){
+  var r={days:0,big:0,huge:0,full:0,gym:0,drive:0,early:0,best:0,streakBest:(S.streak&&S.streak.best)||0,dir:{}};
+  var ttl={};S.tasks.forEach(function(t){ttl[t.id]=t.title||''});
+  for(var d in S.log){
+    var done=S.log[d].done||{},sum=0,byd={},k,dir;
+    for(k in done){
+      sum+=done[k];dir=findDir(k);
+      if(dir)byd[dir]=(byd[dir]||0)+done[k];
+      if((ttl[k]||'').indexOf('Вождение')===0&&done[k]>=60)r.drive++;
+    }
+    if(!sum)continue;
+    r.days++;
+    if(sum>=480)r.big++;
+    if(sum>=600)r.huge++;
+    if((byd.body||0)>=60)r.gym++;
+    r.best=Math.max(r.best,sum);
+    for(k in byd)r.dir[k]=(r.dir[k]||0)+byd[k];
+    var p=planDay(d);
+    if(p.planned&&p.done>=p.planned-1)r.full++;
+  }
+  return r;
+}
 function badges(){
-  var st=streak(),th=totalMin()/60,paid=S.clients.filter(function(c){return c.stage===4}).length;
+  var H=history(),st=streak(),th=totalMin()/60;
+  var paid=S.clients.filter(function(c){return c.stage===4}).length;
   var reels=S.reels.filter(function(r){return r.stage>=4}).length;
-  var and=(minByDir()['android']||0)/60,sit=(minByDir()['sites']||0)/60;
-  return [
-    ['Семь дней подряд',st>=7,'Серия 7 дней','7'],
-    ['Четырнадцать подряд',st>=14,'Серия 14 дней','14'],
-    ['Сто часов',th>=100,'100 часов в сумме','100'],
-    ['Android: 40 часов',and>=40,'40 часов разработки','A'],
-    ['Сайты: 40 часов',sit>=40,'40 часов на клиентов и код','C'],
-    ['Первая оплата',paid>=1,'Клиент дошёл до оплаты','₽'],
-    ['Три клиента',paid>=3,'Три оплаты','₽₽'],
-    ['Пять роликов',reels>=5,'Пять опубликованных роликов','▶']
-  ];
+  var h=function(k){return (H.dir[k]||0)/60};
+  var m=todayIso().slice(0,7);
+  var B=[];
+  function add(name,desc,icon,cur,need){B.push({n:name,d:desc,i:icon,c:cur,t:need,g:cur>=need})}
+  /* серия и дисциплина */
+  add('Три дня подряд','Серия 3 дня','3',Math.max(st,H.streakBest),3);
+  add('Неделя без срывов','Серия 7 дней','7',Math.max(st,H.streakBest),7);
+  add('Две недели','Серия 14 дней','14',Math.max(st,H.streakBest),14);
+  add('Месяц в строю','Серия 30 дней','30',Math.max(st,H.streakBest),30);
+  add('Шестьдесят','Серия 60 дней','60',Math.max(st,H.streakBest),60);
+  add('План закрыт полностью','5 дней, где сделано всё до минуты','✓',H.full,5);
+  add('Двадцать дней в журнале','20 дней с отметками','20',H.days,20);
+  add('Сотня дней','100 дней с отметками','100',H.days,100);
+  /* объём работы */
+  add('Первые 25 часов','25 часов в сумме','25',Math.round(th),25);
+  add('Сто часов','100 часов в сумме','100',Math.round(th),100);
+  add('Двести пятьдесят','250 часов в сумме','250',Math.round(th),250);
+  add('Пятьсот','500 часов в сумме','500',Math.round(th),500);
+  add('Длинный день','День на 8 часов работы','8ч',H.big,1);
+  add('Пять длинных дней','Пять дней по 8 часов','8×5',H.big,5);
+  add('Десятка','День на 10 часов работы','10ч',H.huge,1);
+  /* направления */
+  add('Android: 20 часов','20 часов разработки','A',Math.round(h('android')),20);
+  add('Android: 60 часов','60 часов разработки','A+',Math.round(h('android')),60);
+  add('Android: 150 часов','150 часов, это уже уровень','A++',Math.round(h('android')),150);
+  add('Сайты: 20 часов','20 часов на клиентов и код','C',Math.round(h('sites')),20);
+  add('Сайты: 60 часов','60 часов на клиентов и код','C+',Math.round(h('sites')),60);
+  add('Теория на 20 часов','20 часов билетов и разборов','ПДД',Math.round(h('pdd')),20);
+  add('Десять занятий вождения','10 занятий за рулём','В',H.drive,10);
+  add('Учёба: 40 часов','40 часов ТИСБИ и практики','У',Math.round(h('study')),40);
+  add('Контент: 20 часов','20 часов съёмки и монтажа','К',Math.round(h('content')),20);
+  /* тело */
+  add('Десять залов','10 тренировок','10',H.gym,10);
+  add('Тридцать залов','30 тренировок','30',H.gym,30);
+  add('Сто залов','100 тренировок','100',H.gym,100);
+  /* деньги */
+  add('Первые деньги','Любая запись о заработке','₽',moneySum()>0?1:0,1);
+  add('Первая оплата от клиента','Клиент дошёл до оплаты','₽',paid,1);
+  add('Три оплаты','Три клиента заплатили','₽₽',paid,3);
+  add('Отдельная работа','Первый заработок вне сайтов','₽',moneySum('job')>0?1:0,1);
+  add('Двадцать тысяч подработкой','20 000 ₽ отдельной работой','20к',Math.round(moneySum('job')/1000),20);
+  add('Цель месяца взята','Месячная цель по деньгам закрыта','★',moneySum(null,m),S.settings.goal||60000);
+  add('Сто тысяч','100 000 ₽ заработано всего','100к',Math.round(moneySum()/1000),100);
+  /* контент */
+  add('Первый ролик','Ролик дошёл до публикации','▶',reels,1);
+  add('Пять роликов','Пять опубликованных роликов','▶5',reels,5);
+  add('Пятнадцать роликов','Пятнадцать публикаций','▶15',reels,15);
+  B.sort(function(a,b){
+    if(a.g!==b.g)return a.g?-1:1;
+    return (b.c/b.t)-(a.c/a.t);
+  });
+  return B;
 }
 function viewStat(){
   var t=todayIso(),mStart=t.slice(0,8)+'01',rk=rank(),st=streak();
@@ -939,7 +1079,9 @@ function viewStat(){
      '<div><div class="lab">Серия</div><b>'+st+'</b></div>'+
      '<div><div class="lab">Щиты</div><b>'+shieldsLeft()+'</b></div>'+
      '<div><div class="lab">Часов в месяце</div><b>'+hmS(monTot)+'</b></div>'+
-     '<div><div class="lab">Всего</div><b>'+hmS(totalMin())+'</b></div></div>';
+     '<div><div class="lab">Всего часов</div><b>'+hmS(totalMin())+'</b></div>'+
+     '<div><div class="lab">Деньги за месяц</div><b>'+rub(moneySum(null,t.slice(0,7)))+'</b></div>'+
+     '<div><div class="lab">Отдельной работой</div><b>'+rub(moneySum('job',t.slice(0,7)))+'</b></div></div>';
   /* календарь месяца */
   var d1=prs(mStart),days=new Date(d1.getFullYear(),d1.getMonth()+1,0).getDate(),off=wday(mStart)-1;
   h+='<div class="sect"><div class="lab">Календарь месяца</div><div class="line"></div></div><div class="card">'+
@@ -960,9 +1102,15 @@ function viewStat(){
   });
   h+='</div></div>';
   /* достижения */
-  h+='<div class="sect"><div class="lab">Достижения</div><div class="line"></div></div><div class="card pad0" style="padding:4px 14px">';
-  badges().forEach(function(b){
-    h+='<div class="badge'+(b[1]?' got':'')+'"><div class="ic">'+b[3]+'</div><div><div class="nm">'+b[0]+'</div><div class="ds">'+b[2]+'</div></div></div>';
+  var BG=badges(),got=BG.filter(function(b){return b.g}).length;
+  h+='<div class="sect"><div class="lab">Достижения</div><div class="line"></div><div class="dim" style="font-size:12px">'+got+' из '+BG.length+'</div></div>'+
+     '<div class="card pad0" style="padding:4px 14px">';
+  BG.forEach(function(b){
+    var pc=Math.min(100,Math.round(b.c/b.t*100));
+    h+='<div class="badge'+(b.g?' got':'')+'"><div class="ic">'+b.i+'</div><div style="flex:1;min-width:0"><div class="nm">'+b.n+'</div>'+
+       '<div class="ds">'+b.d+'</div>'+
+       (b.g?'':'<div class="pg"><i style="width:'+pc+'%"></i></div>')+'</div>'+
+       (b.g?'<div class="bok">'+IC.check+'</div>':'<div class="bct">'+(b.t>=1000?Math.round(b.c/1000)+'к':b.c)+'/'+(b.t>=1000?Math.round(b.t/1000)+'к':b.t)+'</div>')+'</div>';
   });
   h+='</div><div style="height:26px"></div>';
   V.innerHTML=h;
@@ -998,7 +1146,7 @@ function viewSet(){
     '<button class="btn sm" data-act="copyData">Скопировать текстом</button>'+
     '<button class="btn sm danger" data-act="reset">Сбросить всё</button></div>'+
     '<input type="file" id="fileIn" accept="application/json,.json" style="display:none"></div>';
-  h+='<div class="dim" style="font-size:11.5px;text-align:center;margin:18px 0 30px">devnprt.planner · сборка 3, ноябрь 2026 · работает без интернета</div>';
+  h+='<div class="dim" style="font-size:11.5px;text-align:center;margin:18px 0 30px">devnprt.planner · сборка 4, ноябрь 2026 · работает без интернета</div>';
   V.innerHTML=h;
 }
 
@@ -1091,6 +1239,7 @@ function sheetTask(id){
    '<div class="f" style="flex:1"><label>Совмещается с</label><div class="seg" id="f_par">'+
      [['','нет']].concat(DKEYS.map(function(k){return [k,DIRS[k].t]})).map(function(x){
        return '<button data-pick="par" data-v="'+x[0]+'" class="'+(((t.par||'')===x[0])?'on':'')+'">'+x[1]+'</button>'}).join('')+'</div></div></div>'+
+   '<div class="dim" style="font-size:11.5px;margin:-8px 0 14px">Достаточно отметить у одного дела из пары. Если отмечено у обоих, главным станет тот, что длиннее, второй встанет поверх него. Пары нет в этом дне, блок просто встанет сам по себе.</div>'+
    '<div class="f"><label>Какие недели</label><div class="seg" id="f_weeks">'+
       [['all','Все'],['odd','Нечётные'],['even','Чётные']].map(function(x){
       return '<button data-pick="weeks" data-v="'+x[0]+'" class="'+(t.weeks===x[0]?'on':'')+'">'+x[1]+'</button>'}).join('')+'</div></div>'+
@@ -1105,6 +1254,23 @@ function sheetTask(id){
   openSheet(h);
 }
 var TMP={};
+function sheetMoney(id){
+  var r=id?S.income.filter(function(x){return x.id===id})[0]:null,nw=!r;
+  r=r||{id:uid(),title:'',kind:'job',sum:'',date:todayIso(),hours:''};
+  var h='<h3>'+(nw?'Новый заработок':'Заработок')+'</h3>'+
+   '<div class="f"><label>Откуда</label><input type="text" id="m_title" value="'+esc(r.title||'')+'" placeholder="Например: смена на складе"></div>'+
+   '<div class="f"><label>Вид</label><div class="seg" id="m_kind">'+MKEYS.map(function(k){
+      return '<button data-pick="kind" data-v="'+k+'" class="'+((r.kind||'job')===k?'on':'')+'">'+MKIND[k]+'</button>'}).join('')+'</div></div>'+
+   '<div style="display:flex;gap:12px"><div class="f" style="flex:1"><label>Сколько, ₽</label><input type="number" inputmode="numeric" id="m_sum" value="'+(r.sum||'')+'"></div>'+
+   '<div class="f" style="flex:1"><label>Часов</label><input type="number" inputmode="numeric" id="m_hours" value="'+(r.hours||'')+'" placeholder="не обязательно"></div></div>'+
+   '<div class="f"><label>Когда</label><input type="date" id="m_date" value="'+(r.date||todayIso())+'"></div>'+
+   '<div class="dim" style="font-size:11.5px;margin:-6px 0 14px">Часы нужны только для подсчёта ставки за час. Деньги за месяц складываются из этого журнала и оплат от клиентов.</div>'+
+   '<div class="row-btns"><button class="btn pri" data-act="saveMoney" data-id="'+(nw?'':r.id)+'">Сохранить</button>'+
+   (nw?'':'<button class="btn danger" data-act="delMoney" data-id="'+r.id+'">Удалить</button>')+
+   '<button class="btn ghost" data-act="closeSheet">Отмена</button></div>';
+  TMP={kind:r.kind||'job'};
+  openSheet(h);
+}
 function sheetCard(kind,id){
   var arr=kind==='c'?S.clients:S.reels,c=id?arr.filter(function(x){return x.id===id})[0]:null,nw=!c;
   c=c||{id:uid(),name:'',note:'',stage:0,sum:''};
@@ -1151,6 +1317,7 @@ document.addEventListener('click',function(e){
     if(p==='day'){var n=+v,i=TMP.days.indexOf(n);if(i<0)TMP.days.push(n);else TMP.days.splice(i,1);el.classList.toggle('on')}
     if(p==='core'){TMP.core=!TMP.core;el.classList.toggle('on')}
     if(p==='par'){TMP.par=v;el.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.dataset.v===v)})}
+    if(p==='kind'){TMP.kind=v;el.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.dataset.v===v)})}
     if(p==='qdone'){TMP.qdone=!TMP.qdone;el.classList.toggle('on')}
     if(p==='pmin'){var pi=document.getElementById('p_min')||document.getElementById('q_min');if(pi)pi.value=v;
       el.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.dataset.v===v)})}
@@ -1287,6 +1454,23 @@ document.addEventListener('click',function(e){
       break; }
     case 'newcard': sheetCard(v,null); break;
     case 'editcard': sheetCard(v,id); break;
+    case 'newmoney': sheetMoney(null); break;
+    case 'editmoney': sheetMoney(id); break;
+    case 'saveMoney': {
+      var mr=id?S.income.filter(function(x){return x.id===id})[0]:{id:uid()};
+      mr.title=document.getElementById('m_title').value.trim()||'Без названия';
+      mr.kind=TMP.kind||'job';
+      mr.sum=parseInt(document.getElementById('m_sum').value,10)||0;
+      mr.hours=parseFloat(document.getElementById('m_hours').value)||0;
+      mr.date=document.getElementById('m_date').value||todayIso();
+      if(!id)S.income.push(mr);
+      save(); closeSheet(); render(); toast('Записано'); break; }
+    case 'delMoney': {
+      if(!armed(el,'Удалить запись?'))break;
+      var goneM=S.income.filter(function(x){return x.id===id})[0];
+      S.income=S.income.filter(function(x){return x.id!==id});
+      save(); closeSheet(); render();
+      toast('Запись удалена',function(){if(goneM){S.income.push(goneM);save();render()}}); break; }
     case 'saveCard': {
       var arr=v==='c'?S.clients:S.reels,c=id?arr.filter(function(x){return x.id===id})[0]:{id:uid()};
       c.name=document.getElementById('c_name').value.trim()||'Без названия';
