@@ -229,10 +229,12 @@ body.dragging{user-select:none;-webkit-user-select:none}
 .picklist{max-height:48vh;overflow:auto;margin:0 -2px 2px;padding:0 2px}
 .pickrow{display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:11px 12px;margin-bottom:7px;
   border:1px solid var(--line2);border-radius:12px;background:var(--panel2);color:var(--fg)}
-.pickrow i{width:3px;height:24px;border-radius:2px;flex:0 0 3px}
+.pickrow>i{width:3px;height:24px;border-radius:2px;flex:0 0 3px}
 .pickrow .pn{flex:1;min-width:0;font-size:14px;overflow:hidden}
 .pickrow .sub{display:block;font-style:normal;font-size:11px;line-height:1.35;color:var(--dim2);margin-top:3px}
 .pickrow .sub.warn{color:var(--warn)}
+.pickrow.on{border-color:color-mix(in srgb,var(--acc) 45%,transparent);background:var(--accSoft)}
+.pickrow.on .pm{color:var(--acc)}
 .pickrow .pm{font-size:11.5px;color:var(--dim2);white-space:nowrap;font-variant-numeric:tabular-nums}
 .mbar{display:flex;gap:1px;margin:15px 0 0;background:var(--line2);border-radius:var(--rs);overflow:hidden}
 .mbar>div{flex:1;background:var(--panel2);padding:10px 11px;min-width:0;overflow:hidden}
@@ -289,13 +291,14 @@ body.lock{position:fixed;left:0;right:0;width:100%;overflow:hidden}
 .sheet h3{font-size:17px;font-weight:400;margin:0 0 14px}
 .menu button{display:flex;width:100%;gap:11px;align-items:center;padding:14px 2px;border-bottom:1px solid var(--line2);font-size:15px;text-align:left;line-height:1.35}
 .menu button:last-child{border-bottom:0}
-.toast{position:fixed;left:50%;transform:translateX(-50%) translateY(10px);bottom:calc(88px + env(safe-area-inset-bottom));z-index:80;
+.toast{position:fixed;left:0;right:0;margin:0 auto;width:fit-content;transform:translateY(10px);
+  bottom:calc(88px + env(safe-area-inset-bottom));z-index:80;
   background:var(--panel2);color:var(--fg);border:1px solid var(--line);padding:0;border-radius:16px;
   font-size:13px;line-height:1.45;text-align:left;overflow:hidden;
   max-width:min(92vw,440px);opacity:0;pointer-events:none;
   box-shadow:0 1px 0 rgba(255,255,255,.05) inset,0 20px 40px -20px rgba(0,0,0,.9);
   transition:opacity .2s ease,transform .26s cubic-bezier(.2,.85,.3,1)}
-.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.on{opacity:1;transform:translateY(0)}
 .toast .tin{display:flex;align-items:stretch}
 .toast .tmsg{flex:1;min-width:0;align-self:center;padding:11px 15px;overflow-wrap:anywhere}
 .toast:not(.act) .tmsg{text-align:center}
@@ -303,10 +306,11 @@ body.lock{position:fixed;left:0;right:0;width:100%;overflow:hidden}
   border-left:1px solid var(--line);color:var(--acc);font-size:13px;font-weight:500;white-space:nowrap}
 .toast .tundo:active{background:var(--accSoft)}
 .toast .tbar{display:block;height:2px;background:var(--acc);opacity:.5;transform-origin:left center}
-.toast.act .tbar{animation:drain 5.2s linear forwards}
+.toast.act .tbar{animation:drain 3.4s linear forwards}
 @keyframes drain{from{transform:scaleX(1)}to{transform:scaleX(0)}}
 .toast.act{pointer-events:auto}
-#sheet.open ~ .toast{bottom:calc(50vh - 20px)}
+#sheet.open ~ .toast{top:calc(9px + env(safe-area-inset-top));bottom:auto;transform:translateY(-10px)}
+#sheet.open ~ .toast.on{transform:translateY(0)}
 
 @media (max-width:359px){
   .wrap,.top-in{padding-left:13px;padding-right:13px}
@@ -657,9 +661,20 @@ function instances(d){
 /* ======== расчёт дня ========
    Никакой автоматической укладки: у каждого дела стоит своё время.
    Приложение только считает перерывы между делами, ловит накладки и собирает итоги. */
+/* длительность из пары «начало, конец»; конец раньше начала значит за полночь */
+function spanMin(at,to){
+  if(!at||!to)return 0;
+  var a=t2m(at),m=t2m(to)-a;
+  /* конец раньше начала считается переходом за полночь только поздно вечером */
+  if(m<=0){ if(a>=20*60&&m+1440<=5*60)m+=1440; else return 0; }
+  return Math.min(1435,m);
+}
+function endT(at,min){return m2t((t2m(at)+(+min||0))%1440)}
 function planDay(d){
   var L=logOf(d),items=instances(d),i,j,o;
-  var linked=function(a,b){return !!((a.par&&(a.par===b.id||a.par===b.dir))||(b.par&&(b.par===a.id||b.par===a.dir)))};
+  /* не накладка: одно подцеплено к другому, либо оба подцеплены к одному и тому же делу */
+  var linked=function(a,b){return !!((a.par&&(a.par===b.id||a.par===b.dir))||(b.par&&(b.par===a.id||b.par===a.dir))
+    ||(a.par&&b.par&&a.par===b.par)||(a.hostId&&a.hostId===b.hostId))};
   for(i=0;i<items.length;i++){
     o=items[i];
     o.s=t2m(o.at); o.e=o.s+o.min;
@@ -672,9 +687,16 @@ function planDay(d){
   /* дело, помеченное «идёт вместе», ложится поверх хозяина и накладкой не считается */
   act.forEach(function(x){
     if(!x.par)return;
-    var h=act.filter(function(y){return y!==x&&(y.id===x.par||y.dir===x.par)&&y.s<x.e&&x.s<y.e})[0];
-    if(h){x.parallel=true;x.hostTitle=h.title}
+    var h=act.filter(function(y){return y!==x&&(y.id===x.par||y.dir===x.par)})
+           .sort(function(m,n){return n.min-m.min})[0];
+    if(!h)return;
+    /* совмещённое дело начинается вместе с хозяином, если его не двигали руками в этот день */
+    var hand=L.ovr[x.id]&&L.ovr[x.id].at;
+    if(!hand&&x.s!==h.s){x.s=h.s;x.e=x.s+x.min;x.at=m2t(x.s)}
+    if(x.s<h.e&&h.s<x.e){x.parallel=true;x.hostTitle=h.title;x.hostId=h.id;(h.withT=h.withT||[]).push(x.title)}
   });
+  act.sort(function(a,b){return (a.s-b.s)||(b.min-a.min)||(a.title<b.title?-1:1)});
+  items.sort(function(a,b){return (a.s-b.s)||(b.min-a.min)||(a.title<b.title?-1:1)});
   for(i=0;i<act.length;i++){
     for(j=i+1;j<act.length;j++){
       if(act[j].s>=act[i].e)break;
@@ -796,14 +818,23 @@ function renderTabs(){
   mc.innerHTML=S.settings.mode==='B'?'<b>Полный день</b>':'<b>С работой</b>';
 }
 var UNDO=null;
+function hideToast(){
+  var e=document.getElementById('toast');
+  clearTimeout(e._t);e.classList.remove('on');e.classList.remove('act');UNDO=null;
+}
+/* короткое имя дела для подсказок: без хвоста после запятой и двоеточия */
+function shortName(t,n){
+  t=String(t||'').split(',')[0].split(':')[0].trim(); n=n||18;
+  return t.length>n?(t.slice(0,n-1).trim()+'…'):t;
+}
 function toast(t,undo){
   var e=document.getElementById('toast');
-  e.innerHTML='<div class="tin"><span class="tmsg">'+esc(t)+'</span>'+
+  e.innerHTML='<div class="tin"><span class="tmsg" data-act="toastHide">'+esc(t)+'</span>'+
     (undo?'<button type="button" class="tundo" data-act="undo">Вернуть</button>':'')+'</div>'+
     (undo?'<i class="tbar"></i>':'');
   e.classList.toggle('act',!!undo);UNDO=undo||null;
   e.classList.add('on');clearTimeout(e._t);
-  e._t=setTimeout(function(){e.classList.remove('on');e.classList.remove('act');UNDO=null},undo?5200:1700);
+  e._t=setTimeout(function(){e.classList.remove('on');e.classList.remove('act');UNDO=null},undo?3400:1400);
 }
 
 /* ---------------- ДЕНЬ ---------------- */
@@ -890,7 +921,8 @@ function itemHTML(o,d){
     '<div class="mid"><div class="ttl">'+
       '<button class="chk" data-act="toggle" data-id="'+o.id+'">'+IC.check+'</button>'+
       '<span>'+esc(o.title)+'</span>'+
-      (o.parallel?'<span class="tag acc">'+(o.hostTitle?'вместе с: '+esc(o.hostTitle.split(',')[0].toLowerCase()):'параллельно')+'</span>':'')+
+      (o.parallel?'<span class="tag acc">'+(o.hostTitle?'вместе с: '+esc(shortName(o.hostTitle,18).toLowerCase()):'параллельно')+'</span>':'')+
+      (o.withT&&o.withT.length?'<span class="tag acc">вместе: '+esc(o.withT.map(function(x){return shortName(x,14).toLowerCase()}).join(', '))+'</span>':'')+
       (o.optional?'<span class="tag">можно не идти</span>':'')+
       (o.skipped?'<span class="tag warn">пропущено</span>':'')+
       (o.clash?'<span class="tag warn">накладка по времени</span>':'')+
@@ -957,19 +989,33 @@ function viewWeek(){
 
 /* ---------------- ЗАДАЧИ ---------------- */
 function repText(t){
-  if(t.date)return 'разовая, '+dateShort(t.date);
+  if(t.date)return 'один раз, '+dateShort(t.date);
   var dd=(S.settings.mode==='A'&&t.daysA)?t.daysA:t.days;
   if(!dd||!dd.length)return 'без дней';
-  if(dd.length===7)return 'каждый день';
+  if(dd.length===7)return 'каждый день'+(t.weeks==='odd'?', нечётные недели':(t.weeks==='even'?', чётные недели':''));
   var s=dd.map(function(n){return WDS[n-1]}).join(' ');
   if(t.weeks==='odd')s+=' · нечётные недели';
   if(t.weeks==='even')s+=' · чётные недели';
   return s;
 }
+/* «09:00 до 10:30» для режима, который открыт сейчас */
+function tSpan(t){
+  var mA=S.settings.mode==='A';
+  var at=(mA&&t.atA)?t.atA:(t.at||''), mn=(mA&&typeof t.minA==='number')?t.minA:t.min;
+  if(!at)return hm(mn);
+  return at+' до '+endT(at,mn);
+}
+/* с чем совмещено: направление или конкретное дело */
+function parName(p){
+  if(!p)return '';
+  if(DIRS[p])return DIRS[p].t.toLowerCase();
+  var h=S.tasks.filter(function(x){return x.id===p})[0];
+  return h?shortName(h.title,20).toLowerCase():'другое дело';
+}
 function viewTasks(){
   var h='<div class="dayhead"><div><div class="lab">Конструктор</div><h1 class="h1" style="margin-top:2px">Задачи</h1></div>'+
     '<div class="top-sp"></div><button class="btn pri sm" data-act="newtask">'+IC.plus+' Новая</button></div>';
-  h+='<div class="dim" style="font-size:12.5px;margin:6px 0 2px">Шаблоны повторяются сами. Длительность и дни меняются здесь, разовые переносы — в дне.</div>';
+  h+='<div class="dim" style="font-size:12.5px;margin:6px 0 2px">У каждой задачи своё время, своё повторение и свои соседи. Разовые переносы делаются в дне.</div>';
   h+='<div style="display:flex;gap:7px;flex-wrap:wrap;margin:14px 0">'+
      '<button class="btn sm" data-act="quick" data-v="drive">+ Вождение</button>'+
      '<button class="btn sm" data-act="quick" data-v="once">+ Разовая задача</button>'+
@@ -987,8 +1033,7 @@ function viewTasks(){
     list.forEach(function(t){
       h+='<div class="trow'+(t.active?'':' off')+'">'+
         '<div class="mid"><div class="nm">'+esc(t.title)+(t.core?' <span class="tag acc" style="font-size:9px">минимум</span>':'')+(t.only?' <span class="tag">режим '+t.only+'</span>':'')+'</div>'+
-        '<div class="mt">'+repText(t)+' · '+hm((S.settings.mode==='A'&&typeof t.minA==='number')?t.minA:t.min)+
-        ' · '+((S.settings.mode==='A'&&t.atA)?t.atA:(t.at||''))+(t.par?' · вместе с другим делом':'')+'</div></div>'+
+        '<div class="mt">'+repText(t)+' · '+tSpan(t)+(t.par?' · вместе с «'+esc(parName(t.par))+'»':'')+'</div></div>'+
         '<button class="sw'+(t.active?' on':'')+'" data-act="toggleTask" data-id="'+t.id+'"><i></i></button>'+
         '<button class="mini" data-act="edit" data-id="'+t.id+'">'+IC.dots+'</button></div>';
     });
@@ -1239,18 +1284,47 @@ function viewSet(){
     '<button class="btn sm" data-act="copyData">Скопировать текстом</button>'+
     '<button class="btn sm danger" data-act="reset">Сбросить всё</button></div>'+
     '<input type="file" id="fileIn" accept="application/json,.json" style="display:none"></div>';
-  h+='<div class="dim" style="font-size:11.5px;text-align:center;margin:18px 0 30px">devnprt.planner · сборка 12.3, ноябрь 2026 · работает без интернета</div>';
+  h+='<div class="dim" style="font-size:11.5px;text-align:center;margin:18px 0 30px">devnprt.planner · сборка 13, ноябрь 2026 · работает без интернета</div>';
   V.innerHTML=h;
 }
 
 /* ============================ sheet ============================ */
 var SH=document.getElementById('sheet'),SB=document.getElementById('sheetBody');
+/* пока правите начало или конец, под полями живьём считается длительность */
+SB.addEventListener('input',function(e){
+  var k=e.target.id||'';
+  if(!/^(f_at|f_to|q_at|q_to|t_at|t_to)$/.test(k))return;
+  var pair={f_at:'f_to',q_at:'q_to',t_at:'t_to'}[k];
+  if(pair){
+    /* двигаем начало, конец едет следом: длительность сохраняется */
+    var B=document.getElementById(pair),pv=e.target._prev;
+    if(B&&B.value&&pv&&e.target.value&&pv!==e.target.value){
+      var dl=t2m(e.target.value)-t2m(pv);
+      B.value=m2t(((t2m(B.value)+dl)%1440+1440)%1440);
+    }
+    e.target._prev=e.target.value;
+  }
+  durHint();
+});
 var LOCKY=0;
+/* подпись «выходит столько-то» под парой полей начало-конец */
+function durHint(){
+  [['f_at','f_to','f_dur'],['q_at','q_to','q_dur'],['t_at','t_to','t_dur']].forEach(function(x){
+    var A=document.getElementById(x[0]),B=document.getElementById(x[1]),O=document.getElementById(x[2]);
+    if(!A)return;
+    if(A._prev===undefined)A._prev=A.value;
+    if(!B||!O)return;
+    var mn=spanMin(A.value,B.value);
+    O.textContent=!A.value||!B.value?'не задано'
+      :(A.value===B.value?(x[0]==='f_at'?'ноль, дела нет в этом режиме':'ноль')
+      :(mn?hm(mn):'конец раньше начала'));
+  });
+}
 function openSheet(html){
   if(!SH.classList.contains('open')){
     LOCKY=window.scrollY;document.body.style.top=(-LOCKY)+'px';document.body.classList.add('lock');
   }
-  SB.innerHTML=html;SH.classList.add('open');
+  SB.innerHTML=html;SH.classList.add('open');durHint();
   var cx=SH.querySelector('.cardx');cx.scrollTop=0;cx.style.transform='';
 }
 function closeSheet(){
@@ -1301,6 +1375,8 @@ function sheetMenu(id){
     '<div class="menu">'+
     '<button data-act="toggle" data-id="'+id+'">'+(o.done?'Снять отметку':'Отметить сделанным')+'</button>'+
     '<button data-act="part" data-id="'+id+'">Записать часть времени</button>'+
+    (o.parallel?'<button data-act="unpair" data-id="'+id+'">Отцепить от «'+esc(shortName(o.hostTitle,20))+'»</button>'
+              :(tk?'<button data-act="withAsk" data-id="'+id+'">Что идёт вместе с этим делом</button>':''))+
     '<button data-act="tune" data-id="'+id+'">Сдвинуть время или длительность, только сегодня</button>'+
     (o.virt?'':'<button data-act="pickFor" data-id="'+id+'">Заменить на другую задачу</button>')+
     '<button data-act="tomorrow" data-id="'+id+'">Перенести на завтра</button>'+
@@ -1317,19 +1393,26 @@ function sheetTask(id){
   t=t||T({title:'',dir:'sites',min:60,days:[1,2,3,4,5]});
   var mA=S.settings.mode==='A';
   var eMin=(mA&&typeof t.minA==='number')?t.minA:t.min;
+  var eAt=(mA&&t.atA)?t.atA:(t.at||'12:00');
   var eDays=((mA&&t.daysA)?t.daysA:(t.days||[]));
   var oMin=(mA?t.min:(typeof t.minA==='number'?t.minA:t.min));
   var oDays=(mA?(t.days||[]):((t.daysA)?t.daysA:(t.days||[])));
   var diff=(oMin!==eMin)||(oDays.join()!==eDays.join());
+  var eRep=t.date?'once':(eDays.length===7?'daily':'days');
   var h='<h3>'+(nw?'Новая задача':'Задача')+'</h3>'+
    '<div class="f"><label>Название</label><input type="text" id="f_title" value="'+esc(t.title)+'" placeholder="Например: Android, второй блок"></div>'+
    '<div class="f"><label>Направление</label><div class="seg" id="f_dir">'+DKEYS.map(function(k){
       return '<button data-pick="dir" data-v="'+k+'" class="'+(t.dir===k?'on':'')+'">'+DIRS[k].t+'</button>'}).join('')+'</div></div>'+
    '<div class="dim" style="font-size:11.5px;margin:-6px 0 12px">Правите режим «'+(mA?'С работой':'Полный день')+'». '+
      (diff?'В другом режиме: '+hm(oMin)+', '+(oDays.length?oDays.map(function(x){return WDS[x-1]}).join(' '):'нет дней'):'Во втором режиме сейчас так же')+'</div>'+
-   '<div style="display:flex;gap:12px"><div class="f" style="flex:1"><label>Минут</label><input type="number" inputmode="numeric" id="f_min" value="'+eMin+'"></div>'+
-   '<div class="f" style="flex:1"><label>Начало</label><input type="time" id="f_at" value="'+((mA&&t.atA)?t.atA:(t.at||'12:00'))+'"></div></div>'+
-   '<div class="dim" style="font-size:11.5px;margin:-8px 0 14px">Время обязательное: дело встаёт в день именно на него.'+((mA&&t.atA)?' В режиме «С работой» у этого дела своё время.':'')+'</div>'+
+   '<div style="display:flex;gap:12px"><div class="f" style="flex:1"><label>Начало</label><input type="time" id="f_at" value="'+eAt+'"></div>'+
+   '<div class="f" style="flex:1"><label>Конец</label><input type="time" id="f_to" value="'+endT(eAt,eMin)+'"></div></div>'+
+   '<div class="dim" style="font-size:11.5px;margin:-8px 0 14px">Выходит <b id="f_dur">'+hm(eMin)+'</b>. Дело встаёт в день именно на это время.'+
+     ((mA&&t.atA)?' В режиме «С работой» у него своё время.':'')+' Поставьте конец равным началу, если в этом режиме дела нет.</div>'+
+   '<div class="f"><label>Повторение</label><div class="seg" id="f_rep">'+
+     [['daily','Каждый день'],['days','По дням недели'],['once','Один раз']].map(function(x){
+       return '<button data-pick="rep" data-v="'+x[0]+'" class="'+(eRep===x[0]?'on':'')+'">'+x[1]+'</button>'}).join('')+'</div></div>'+
+   '<div id="f_wdays"'+(eRep==='days'?'':' style="display:none"')+'>'+
    '<div class="f"><label>Дни недели</label><div class="days" id="f_days">'+WDS.map(function(w,i){
       return '<button data-pick="day" data-v="'+(i+1)+'" class="'+(eDays.indexOf(i+1)>=0?'on':'')+'">'+w+'</button>'}).join('')+'</div></div>'+
    '<div style="display:flex;gap:12px">'+
@@ -1338,16 +1421,17 @@ function sheetTask(id){
        return '<button data-pick="par" data-v="'+x[0]+'" class="'+(((t.par||'')===x[0])?'on':'')+'">'+x[1]+'</button>'}).join('')+'</div></div></div>'+
    '<div class="dim" style="font-size:11.5px;margin:-8px 0 14px">Достаточно отметить у одного дела из пары. Если отмечено у обоих, главным станет тот, что длиннее, второй встанет поверх него. Пары нет в этом дне, блок просто встанет сам по себе.</div>'+
    '<div class="f"><label>Какие недели</label><div class="seg" id="f_weeks">'+
-      [['all','Все'],['odd','Нечётные'],['even','Чётные']].map(function(x){
-      return '<button data-pick="weeks" data-v="'+x[0]+'" class="'+(t.weeks===x[0]?'on':'')+'">'+x[1]+'</button>'}).join('')+'</div></div>'+
-   '<div class="f"><label>Или разовая дата</label><input type="date" id="f_date" value="'+(t.date||'')+'"></div>'+
+      [['all','Каждую'],['odd','Нечётные'],['even','Чётные']].map(function(x){
+      return '<button data-pick="weeks" data-v="'+x[0]+'" class="'+(t.weeks===x[0]?'on':'')+'">'+x[1]+'</button>'}).join('')+'</div></div></div>'+
+   '<div id="f_wonce"'+(eRep==='once'?'':' style="display:none"')+'>'+
+   '<div class="f"><label>Дата</label><input type="date" id="f_date" value="'+(t.date||'')+'"></div></div>'+
    '<div class="f"><label>Заметка</label><input type="text" id="f_note" value="'+esc(t.note||'')+'" placeholder="Коротко, зачем этот блок"></div>'+
    '<div class="trow" style="border-bottom:0"><div class="mid"><div class="nm">Входит в минимум дня</div><div class="mt">Такие блоки держат серию</div></div>'+
    '<button class="sw'+(t.core?' on':'')+'" data-pick="core"><i></i></button></div>'+
    '<div class="row-btns" style="margin-top:16px"><button class="btn pri" data-act="saveTask" data-id="'+(nw?'':t.id)+'">Сохранить</button>'+
    (nw?'':'<button class="btn danger" data-act="delTask" data-id="'+t.id+'">'+(t.date?'Удалить':'Удалить из всех недель')+'</button>')+
    '<button class="btn ghost" data-act="closeSheet">Отмена</button></div>';
-  TMP={dir:t.dir,days:eDays.slice(),weeks:t.weeks,core:!!t.core,par:t.par||'',mA:mA};
+  TMP={dir:t.dir,days:eDays.slice(),weeks:t.weeks,core:!!t.core,par:t.par||'',mA:mA,rep:eRep};
   openSheet(h);
 }
 var TMP={};
@@ -1476,7 +1560,7 @@ document.addEventListener('pointermove',function(e){
     var A=startOf(d,id),B=startOf(d,onto),p2=planDay(d);
     var nmA=(p2.items.filter(function(x){return x.id===id})[0]||{title:''}).title.split(',')[0];
     var nmB=(p2.items.filter(function(x){return x.id===onto})[0]||{title:''}).title.split(',')[0];
-    toast('Поменял местами: '+nmA+' в '+m2t(A)+', '+nmB+' в '+m2t(B),function(){restoreDay(d,snp)});
+    toast('Поменял местами: '+shortName(nmA)+' в '+m2t(A)+', '+shortName(nmB)+' в '+m2t(B),function(){restoreDay(d,snp)});
   });
 });
 document.addEventListener('click',function(e){
@@ -1488,17 +1572,32 @@ document.addEventListener('click',function(e){
     if(p==='weeks'){TMP.weeks=v;el.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.dataset.v===v)})}
     if(p==='stage'){TMP.stage=+v;el.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',+b.dataset.v===+v)})}
     if(p==='day'){var n=+v,i=TMP.days.indexOf(n);if(i<0)TMP.days.push(n);else TMP.days.splice(i,1);el.classList.toggle('on')}
+    if(p==='rep'){
+      TMP.rep=v;el.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.dataset.v===v)});
+      var wd=document.getElementById('f_wdays'),wo=document.getElementById('f_wonce'),dt=document.getElementById('f_date');
+      if(wd)wd.style.display=(v==='days')?'':'none';
+      if(wo)wo.style.display=(v==='once')?'':'none';
+      if(v==='daily'){TMP.days=[1,2,3,4,5,6,7];if(dt)dt.value='';
+        document.querySelectorAll('#f_days button').forEach(function(b){b.classList.add('on')})}
+      if(v==='days'&&dt)dt.value='';
+      if(v==='once'&&dt&&!dt.value)dt.value=S.ui.date;
+    }
     if(p==='core'){TMP.core=!TMP.core;el.classList.toggle('on')}
     if(p==='shiftAfter'){TMP.shift=!TMP.shift;el.classList.toggle('on')}
     if(p==='par'){TMP.par=v;el.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.dataset.v===v)})}
     if(p==='kind'){TMP.kind=v;el.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.dataset.v===v)})}
     if(p==='qdone'){TMP.qdone=!TMP.qdone;el.classList.toggle('on')}
-    if(p==='pmin'){var pi=document.getElementById('p_min')||document.getElementById('q_min');if(pi)pi.value=v;
+    if(p==='pmin'){
+      var pi=document.getElementById('p_min');
+      if(pi)pi.value=v;
+      else{var qa0=document.getElementById('q_at'),qt0=document.getElementById('q_to');
+        if(qa0&&qt0&&qa0.value){qt0.value=endT(qa0.value,+v);durHint()}}
       el.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.dataset.v===v)})}
     return;
   }
   var a=el.dataset.act;
   switch(a){
+    case 'toastHide': hideToast(); break;
     case 'go': go(v); break;
     case 'closeSheet': closeSheet(); break;
     case 'dday': S.ui.date=addD(d,+v); save(); render(true); break;
@@ -1540,8 +1639,11 @@ document.addEventListener('click',function(e){
     case 'tune': sheetTune(id); break;
     case 'saveTune': {
       L=logOf(d);
-      var at=document.getElementById('t_at').value,mn=parseInt(document.getElementById('t_min').value,10);
+      var at=document.getElementById('t_at').value,tto=document.getElementById('t_to').value;
       if(!at){toast('Поставьте время начала');break}
+      if(!tto){toast('Поставьте время конца');break}
+      var mn=spanMin(at,tto);
+      if(!mn){toast('Конец должен быть позже начала');break}
       var cur=planDay(d).items.filter(function(x){return x.id===id})[0];
       var snpT=snapDay(d),curS=cur?cur.s:null,curE=cur?cur.e:null;
       var newMin=(mn>0?mn:(cur?cur.min:30));
@@ -1587,7 +1689,7 @@ document.addEventListener('click',function(e){
       var nid=LASTPUT||id;
       if(repAt!=null)moveBlock(d,nid,repAt);
       save(); closeSheet(); render();
-      toast(v?moveMsg(d,nid):(res==='copy'?'Поставил ещё один такой блок, в '+m2t(startOf(d,nid)||0):'Задача в плане на '+m2t(startOf(d,nid)||0)),
+      toast(v?moveMsg(d,nid):spanMsg(d,nid,res==='copy'?'Поставил ещё раз':'Поставил'),
             function(){restoreDay(d,snapP)});
       break; }
     case 'grab': break;   /* перетаскивание ведёт отдельный слушатель ниже */
@@ -1602,6 +1704,24 @@ document.addEventListener('click',function(e){
       toast(moveMsg(d,id,null)+', '+moveMsg(d,nb,null).toLowerCase(),function(){restoreDay(d,snpM)});
       break; }
     case 'swapAsk': closeSheet(); sheetSwap(id); break;
+    case 'withAsk': closeSheet(); sheetWith(id); break;
+    case 'unpair': {
+      var up=S.tasks.filter(function(x){return x.id===id})[0]; if(!up)break;
+      var snpU=JSON.stringify(S.tasks);
+      up.par=null; save(); closeSheet(); render();
+      toast('Теперь идёт само по себе',function(){S.tasks=JSON.parse(snpU);save();render()}); break; }
+    case 'withTog': {
+      var hostT=S.tasks.filter(function(x){return x.id===id})[0];
+      var sub=S.tasks.filter(function(x){return x.id===v})[0];
+      if(!hostT||!sub)break;
+      var snpW=JSON.stringify(S.tasks),wasOn=(sub.par===id||(sub.par&&sub.par===hostT.dir));
+      sub.par=wasOn?null:id;
+      save(); render();
+      var keep=SH.querySelector('.cardx').scrollTop;
+      sheetWith(id); SH.querySelector('.cardx').scrollTop=keep;
+      toast(wasOn?('Отцепил: '+shortName(sub.title)):(shortName(sub.title)+' начинается вместе с «'+shortName(hostT.title)+'»'),
+        function(){S.tasks=JSON.parse(snpW);save();render();sheetWith(id)});
+      break; }
     case 'swapDo': {
       var snpS=snapDay(d);
       if(!swapTimes(d,id,v)){toast('Эти дела стоят на одном времени');break}
@@ -1629,28 +1749,35 @@ document.addEventListener('click',function(e){
     case 'addDay': {
       var qt=document.getElementById('q_title').value.trim();
       if(!qt){toast('Напишите, что за задача');break}
-      var qm=parseInt(document.getElementById('q_min').value,10)||30;
-      var qa=document.getElementById('q_at').value;
+      var qa=document.getElementById('q_at').value,qto=document.getElementById('q_to').value;
       if(!qa){toast('Поставьте время начала');break}
+      if(!qto){toast('Поставьте время конца');break}
+      var qm=spanMin(qa,qto);
+      if(!qm){toast('Конец должен быть позже начала');break}
       var qn=T({title:qt,dir:TMP.dir||'sites',min:qm,at:qa,days:[],date:d});
       S.tasks.push(qn);
       if(TMP.qdone){L=logOf(d);L.done[qn.id]=qm}
       save(); closeSheet(); render();
-      toast(TMP.qdone?'Записал как сделанное, '+hm(qm):'Добавлено в '+dateShort(d)); break; }
+      toast(TMP.qdone?'Записал как сделанное, '+hm(qm):('Поставил '+qa+' до '+endT(qa,qm))); break; }
     case 'newtask': sheetTask(null); break;
     case 'edit': closeSheet(); sheetTask(id); break;
     case 'toggleTask': {
       var tt=S.tasks.filter(function(x){return x.id===id})[0]; if(tt){tt.active=!tt.active;save();render()} break; }
     case 'saveTask': {
-      var vDays=TMP.days.slice().sort(),vDate=document.getElementById('f_date').value||null;
-      if(!vDate&&!vDays.length){toast('Выберите дни недели или разовую дату');break}
+      var vRep=TMP.rep||'days';
+      var vDays=(vRep==='daily')?[1,2,3,4,5,6,7]:((vRep==='once')?[]:TMP.days.slice().sort());
+      var vDate=(vRep==='once')?(document.getElementById('f_date').value||null):null;
+      if(vRep==='once'&&!vDate){toast('Поставьте дату');break}
+      if(vRep==='days'&&!vDays.length){toast('Отметьте дни недели');break}
       var nt=id?S.tasks.filter(function(x){return x.id===id})[0]:T({});
       nt.title=document.getElementById('f_title').value.trim()||'Без названия';
       nt.dir=TMP.dir||'sites';
-      var newMin=parseInt(document.getElementById('f_min').value,10)||30;
-      if(TMP.mA&&typeof nt.minA==='number')nt.minA=newMin; else nt.min=newMin;
-      var vAt=document.getElementById('f_at').value;
+      var vAt=document.getElementById('f_at').value,vTo=document.getElementById('f_to').value;
       if(!vAt){toast('Поставьте время начала');break}
+      if(!vTo){toast('Поставьте время конца');break}
+      var newMin=(vAt===vTo)?0:spanMin(vAt,vTo);
+      if(vAt!==vTo&&!newMin){toast('Конец должен быть позже начала');break}
+      if(TMP.mA&&typeof nt.minA==='number')nt.minA=newMin; else nt.min=newMin;
       if(TMP.mA&&nt.atA)nt.atA=vAt; else nt.at=vAt;
       nt.par=TMP.par||null;
       nt.date=document.getElementById('f_date').value||null;
@@ -1672,8 +1799,8 @@ document.addEventListener('click',function(e){
     case 'quick': {
       if(v==='drive')sheetTask(null),setTimeout(function(){
         document.getElementById('f_title').value='Вождение';
-        document.getElementById('f_min').value=120;
         document.getElementById('f_at').value='15:00';
+        document.getElementById('f_to').value='17:00';durHint();
         document.getElementById('f_date').value=S.ui.date;
         TMP.dir='pdd';TMP.days=[];
         document.querySelectorAll('#f_dir button').forEach(function(b){b.classList.toggle('on',b.dataset.v==='pdd')});
@@ -1684,8 +1811,8 @@ document.addEventListener('click',function(e){
         document.querySelectorAll('#f_days button').forEach(function(b){b.classList.remove('on')});},0);
       if(v==='pair')sheetTask(null),setTimeout(function(){
         document.getElementById('f_title').value='ТИСБИ, пары';
-        document.getElementById('f_min').value=170;
         document.getElementById('f_at').value='08:00';
+        document.getElementById('f_to').value='10:50';durHint();
         TMP.dir='study';
         document.querySelectorAll('#f_dir button').forEach(function(b){b.classList.toggle('on',b.dataset.v==='study')});},0);
       break; }
@@ -1765,7 +1892,7 @@ document.addEventListener('change',function(e){
   }
 });
 function sheetDayTask(){
-  var d=S.ui.date;
+  var d=S.ui.date,qs=m2t(freeSlot(d,60,null));
   TMP={dir:'sites',qdone:false};
   openSheet('<h3>Задача на '+dateShort(d)+'</h3>'+
     '<div class="dim" style="font-size:12.5px;margin:-8px 0 14px">Встанет только в этот день. Шаблон недели не меняется.</div>'+
@@ -1773,9 +1900,10 @@ function sheetDayTask(){
     '<div class="f"><label>Направление</label><div class="seg" id="f_dir">'+DKEYS.map(function(k){
        return '<button data-pick="dir" data-v="'+k+'" class="'+(k==='sites'?'on':'')+'">'+DIRS[k].t+'</button>'}).join('')+'</div></div>'+
     '<div style="display:flex;gap:12px"><div class="f" style="flex:1"><label>Начало</label>'+
-      '<input type="time" id="q_at" value="'+m2t(freeSlot(d,60,null))+'"></div>'+
-    '<div class="f" style="flex:1"><label>Минут</label><input type="number" inputmode="numeric" id="q_min" value="60"></div></div>'+
-    '<div class="f"><label>Сколько минут</label><div class="mins">'+[30,45,60,90,120,180].map(function(x){
+      '<input type="time" id="q_at" value="'+qs+'"></div>'+
+    '<div class="f" style="flex:1"><label>Конец</label><input type="time" id="q_to" value="'+endT(qs,60)+'"></div></div>'+
+    '<div class="dim" style="font-size:11.5px;margin:-8px 0 12px">Выходит <b id="q_dur">1 ч</b></div>'+
+    '<div class="f"><label>Или сразу на</label><div class="mins">'+[30,45,60,90,120,180].map(function(x){
        return '<button data-pick="pmin" data-v="'+x+'">'+hm(x)+'</button>'}).join('')+'</div></div>'+
     '<div class="trow" style="border-bottom:0"><div class="mid"><div class="nm">Уже сделано</div>'+
     '<div class="mt">Сразу засчитаю это время в день</div></div>'+
@@ -1868,9 +1996,15 @@ function packDay(d){
 function moveMsg(d,id,was){
   var o=planDay(d).items.filter(function(x){return x.id===id})[0];
   if(!o)return 'Готово';
-  var nm=o.title.split(',')[0];
+  var nm=shortName(o.title);
   if(was!=null&&o.s===was)return nm+' остался в '+m2t(o.s);
   return nm+' теперь в '+m2t(o.s);
+}
+/* «Поставил 10:00 до 11:00» */
+function spanMsg(d,id,pre){
+  var o=planDay(d).items.filter(function(x){return x.id===id})[0];
+  if(!o)return pre;
+  return pre+' '+m2t(o.s)+' до '+m2t(o.e%1440);
 }
 function startOf(d,id){var o=planDay(d).items.filter(function(x){return x.id===id})[0];return o?o.s:null}
 function snapDay(d){return JSON.stringify({l:S.log[d]||null,t:S.tasks})}
@@ -1908,6 +2042,32 @@ function putInDay(tid,d){
   LASTPUT=c.id;
   return 'copy';
 }
+/* что можно делать одновременно с этим блоком */
+function sheetWith(id){
+  var d=S.ui.date,p=planDay(d),host=p.items.filter(function(x){return x.id===id})[0];
+  var ht=S.tasks.filter(function(x){return x.id===id})[0];
+  if(!host||!ht)return;
+  var hDays=(S.settings.mode==='A'&&ht.daysA)?ht.daysA:(ht.days||[]);
+  var attached=function(t){return t.par===id||(t.par&&t.par===ht.dir)};
+  var cand=S.tasks.filter(function(t){return t.active&&t.id!==id&&!t.date});
+  cand.sort(function(a,b){return (attached(b)?1:0)-(attached(a)?1:0)||((a.title<b.title)?-1:1)});
+  var h='<h3>Вместе с «'+esc(shortName(host.title,24))+'»</h3>'+
+    '<div class="dim" style="font-size:12.5px;margin:-9px 0 13px">Отмеченные дела идут в то же время и накладкой не считаются. '+
+    'Например, в зале можно слушать ПДД или разбирать Инстаграм. В дни, когда этого блока нет, отмеченное дело стоит на своём обычном времени.</div>';
+  if(!cand.length)h+='<div class="dim" style="padding:2px 2px 12px;font-size:13px">Других задач пока нет.</div>';
+  else h+='<div class="picklist">'+cand.map(function(t){
+      var on=attached(t);
+      var tDays=(S.settings.mode==='A'&&t.daysA)?t.daysA:(t.days||[]);
+      var common=tDays.filter(function(x){return hDays.indexOf(x)>=0});
+      var sub=on?('идёт вместе, '+tSpan(t)):(common.length?('общих дней '+common.length+' · '+tSpan(t)):'дни не совпадают · '+tSpan(t));
+      return '<button class="pickrow'+(on?' on':'')+'" data-act="withTog" data-id="'+id+'" data-v="'+t.id+'">'+
+        '<i style="background:'+DIRS[t.dir].c+'"></i>'+
+        '<span class="pn">'+esc(t.title)+'<i class="sub'+(!on&&!common.length?' warn':'')+'">'+sub+'</i></span>'+
+        '<span class="pm">'+(on?'вместе':'добавить')+'</span></button>';
+    }).join('')+'</div>';
+  h+='<div class="row-btns" style="margin-top:14px"><button class="btn ghost" data-act="closeSheet">Готово</button></div>';
+  openSheet(h);
+}
 function sheetSwap(id){
   var d=S.ui.date,p=planDay(d),me=p.items.filter(function(x){return x.id===id})[0];
   if(!me)return;
@@ -1934,17 +2094,22 @@ function sheetPick(rep){
   cand.sort(function(a,b){return (DKEYS.indexOf(a.dir)-DKEYS.indexOf(b.dir))||((a.title<b.title)?-1:1)});
   var h='<h3>'+(rt?'Чем заменить':'Что поставить в день')+'</h3>'+
     '<div class="dim" style="font-size:12.5px;margin:-9px 0 13px">'+
-      (rt?'Встанет на '+m2t(rt.s)+' вместо дела «'+esc(rt.title.split(',')[0])+'», только на '+dateShort(d)+'. Шаблон недели не меняется.'
-         :'Задача встанет только в '+dateShort(d)+', на своё время или в ближайшее свободное. Шаблон недели не меняется.')+'</div>';
+      (rt?'Встанет на '+m2t(rt.s)+' вместо дела «'+esc(shortName(rt.title,22))+'», только на '+dateShort(d)+'. Шаблон недели не меняется.'
+         :'Задача встанет только в '+dateShort(d)+'. Под каждой написано, во сколько она встанет и когда закончится.')+'</div>';
   if(!cand.length)h+='<div class="dim" style="padding:2px 2px 12px;font-size:13px">Готовых задач нет. Создайте разовую.</div>';
   else h+='<div class="picklist">'+cand.map(function(t){
       var mn=(S.settings.mode==='A'&&typeof t.minA==='number')?t.minA:t.min;
       if(!mn)mn=t.min||t.minA||30;
       var st=inDay[t.id];
+      var want=(S.settings.mode==='A'&&t.atA)?t.atA:(t.at||'12:00');
+      var put=rt?rt.s:freeSlot(d,mn,t2m(want));
+      var sub='встанет '+m2t(put)+' до '+m2t((put+mn)%1440);
+      if(!rt&&put!==t2m(want))sub+=', своё время занято';
+      if(st)sub='уже в плане на '+m2t(st.s)+' · ещё раз '+m2t(put)+' до '+m2t((put+mn)%1440);
       return '<button class="pickrow" data-act="pickTask" data-id="'+t.id+'" data-v="'+(rep||'')+'">'+
         '<i style="background:'+DIRS[t.dir].c+'"></i>'+
         '<span class="pn">'+esc(t.title)+
-          '<i class="sub">'+(st?'уже в плане на '+m2t(st.s)+', встанет ещё раз':'в шаблоне на '+((S.settings.mode==='A'&&t.atA)?t.atA:(t.at||'')))+'</i>'+
+          '<i class="sub">'+sub+'</i>'+
         '</span>'+
         '<span class="pm">'+hm(mn)+'</span></button>';
     }).join('')+'</div>';
@@ -1973,7 +2138,8 @@ function sheetTune(id){
   openSheet('<h3>'+esc(o.title)+'</h3>'+
     '<div class="dim" style="font-size:12.5px;margin:-8px 0 13px">Меняется только '+dateShort(d)+', шаблон недели остаётся прежним.</div>'+
     '<div style="display:flex;gap:12px"><div class="f" style="flex:1"><label>Начало</label><input type="time" id="t_at" value="'+o.at+'"></div>'+
-    '<div class="f" style="flex:1"><label>Минут</label><input type="number" inputmode="numeric" id="t_min" value="'+o.min+'"></div></div>'+
+    '<div class="f" style="flex:1"><label>Конец</label><input type="time" id="t_to" value="'+endT(o.at,o.min)+'"></div></div>'+
+    '<div class="dim" style="font-size:11.5px;margin:-8px 0 12px">Выходит <b id="t_dur">'+hm(o.min)+'</b></div>'+
     '<div class="trow" style="border-bottom:0"><div class="mid"><div class="nm">Сдвинуть и всё, что после</div>'+
     '<div class="mt">Остальные дела дня переедут на столько же</div></div>'+
     '<button class="sw" data-pick="shiftAfter"><i></i></button></div>'+
