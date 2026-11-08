@@ -105,10 +105,23 @@ html[data-theme="light"] .btn.pri{color:#fff}
 .item .ttl{font-size:14.5px;line-height:1.35;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
 .item .meta{font-size:11.5px;color:var(--dim);margin-top:3px}
 .item .note{font-size:11.5px;color:var(--dim2);margin-top:3px;font-style:italic}
-.item .acts{display:flex;align-items:flex-start;gap:4px;padding-top:1px}
+.item .acts{display:flex;align-items:flex-start;gap:3px;padding-top:1px}
 .item.done .ttl{color:var(--dim2);text-decoration:line-through;text-decoration-color:var(--line)}
 .item.done .bar{opacity:.3}
 .item.over{opacity:.75}
+.item.drag{opacity:.35}
+.grip{width:22px;height:30px;flex:0 0 22px;display:grid;place-items:center;color:var(--line);
+  border-radius:8px;border:1px solid transparent;touch-action:none;cursor:grab}
+.grip:hover{color:var(--dim2);border-color:var(--line)}
+.grip:active{cursor:grabbing}
+.grip svg{width:14px;height:14px;fill:currentColor;stroke:none}
+.dropline{height:0;border-top:2px solid var(--acc);margin:-1px 0;position:relative;z-index:4}
+.dropline:after{content:'';position:absolute;left:-2px;top:-4px;width:7px;height:7px;border-radius:50%;background:var(--acc)}
+.ghostrow{position:fixed;z-index:80;pointer-events:none;max-width:72vw;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;background:var(--panel);color:var(--fg);font-size:13.5px;padding:9px 14px;border-radius:12px;
+  border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);box-shadow:0 16px 36px rgba(0,0,0,.5);opacity:.97}
+.ghostrow i{display:inline-block;width:6px;height:6px;border-radius:2px;margin-right:8px;vertical-align:1px}
+body.dragging{user-select:none;-webkit-user-select:none}
 .chk{width:22px;height:22px;border-radius:7px;border:1.4px solid var(--line);flex:0 0 22px;display:grid;place-items:center;margin-top:1px}
 .chk svg{width:12px;height:12px;stroke:var(--bg);fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;opacity:0}
 .item.done .chk{background:var(--acc);border-color:var(--acc)}
@@ -320,7 +333,7 @@ var KEY='devnprt.planner.v1', MEM=null;
 function load(){try{var s=localStorage.getItem(KEY);return s?JSON.parse(s):null}catch(e){return MEM}}
 function prune(){
   for(var d in S.log){var L=S.log[d];
-    var e=(!L.done||!Object.keys(L.done).length)&&(!L.skip||!L.skip.length)&&(!L.ovr||!Object.keys(L.ovr).length)&&(!L.add||!L.add.length)&&!L.shape&&!L.shield&&!L.focus;
+    var e=(!L.done||!Object.keys(L.done).length)&&(!L.skip||!L.skip.length)&&(!L.ovr||!Object.keys(L.ovr).length)&&(!L.add||!L.add.length)&&!(L.ord&&L.ord.length)&&!L.shape&&!L.shield&&!L.focus;
     if(e)delete S.log[d];}
 }
 function save(){try{prune();localStorage.setItem(KEY,JSON.stringify(S))}catch(e){MEM=S}}
@@ -591,7 +604,17 @@ function planDay(d){
   }
   var busy=act.map(function(o){return {s:o.s,e:o.e}});
   var prio={sites:0,android:1,study:2,content:3,pdd:4,body:5,life:6};
-  floats.sort(function(a,b){return ((a.ord==null?50:a.ord)-(b.ord==null?50:b.ord))||(prio[a.dir]-prio[b.dir])||(b.min-a.min)});
+  /* порядок, заданный руками, важнее автоматического приоритета */
+  var MO=(L.ord&&L.ord.length)?L.ord:null;
+  floats.sort(function(a,b){
+    if(MO){
+      var ra=MO.indexOf(a.id),rb=MO.indexOf(b.id);
+      if(ra>=0&&rb>=0)return ra-rb;
+      if(ra>=0)return -1;
+      if(rb>=0)return 1;
+    }
+    return ((a.ord==null?50:a.ord)-(b.ord==null?50:b.ord))||(prio[a.dir]-prio[b.dir])||(b.min-a.min);
+  });
   var start=dayStart(), end=dayEnd(), breaks=[];
   /* свободные окна между якорями */
   var mb=[],bs=busy.slice().sort(function(a,b){return a.s-b.s});
@@ -620,7 +643,9 @@ function planDay(d){
       for(tie=0;tie<2&&idx<0;tie++){
         for(var k2=0;k2<pend.length;k2++){
           var cf=pend[k2],caf=cf.after?t2m(cf.after):0;
-          if(tie===0&&!cf.after)continue;
+          /* в автоматическом дне привязанное «не раньше» дело берёт окно первым, чтобы не вылететь;
+             если порядок задан руками, приложение не умничает и идёт строго по нему */
+          if(tie===0&&(MO||!cf.after))continue;
           /* перерыв в проверке не участвует: он занимает только место между делами и сам ужимается */
           if(caf>cur){ if(caf+cf.min<=win[wi].e&&(jump===null||caf<jump))jump=caf; continue; }
           if(cur+cf.min<=win[wi].e){idx=k2;break}
@@ -819,6 +844,7 @@ var IC={
   stop:'<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>',
   dots:'<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>',
   plus:'<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+  grip:'<svg viewBox="0 0 24 24"><circle cx="9" cy="5.5" r="1.6"/><circle cx="15" cy="5.5" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18.5" r="1.6"/><circle cx="15" cy="18.5" r="1.6"/></svg>',
   left:'<svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>',
   right:'<svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>'
 };
@@ -884,7 +910,12 @@ function viewDay(){
 
   /* таймлайн */
   h+='<div class="sect"><div class="lab">План дня</div><div class="line"></div>'+
+     (hasOrder(d)?'<button class="btn sm ghost" data-act="ordReset">Собрать заново</button>':'')+
      '<button class="btn sm" data-act="pickDay">'+IC.plus+' Задача</button></div>';
+  h+='<div class="dim" style="font-size:11.5px;margin:-4px 0 9px;line-height:1.5">'+
+     (hasOrder(d)?'Порядок в этом дне вы задали сами, приложение его не трогает. «Собрать заново» вернёт автоматический.'
+                 :'Порядок можно менять: потяните блок за точки справа или откройте его меню. Блоки с точным временем остаются на месте, остальные обтекают их.')+
+     '</div>';
   h+='<div class="card pad0" style="padding:6px 13px"><div class="tl">';
   if(!p.items.length&&!p.over.length)h+='<div class="dim" style="padding:22px 4px;text-align:center">На этот день ничего не запланировано</div>';
   var nowM=(new Date()).getHours()*60+(new Date()).getMinutes(),nowShown=false;
@@ -969,7 +1000,9 @@ function itemHTML(o,d){
   var run=S.ui.timer&&S.ui.timer.id===o.id&&S.ui.timer.date===d;
   var part=o.doneMin>0&&!o.done;
   var time=o.over?'<s>не влезло</s>':(o.s!=null?m2t(o.s)+'<s>'+m2t(o.e)+'</s>':'<s>—</s>');
-  return '<div class="item'+(o.done?' done':'')+(o.over?' over':'')+(o.skipped?' done':'')+'" style="--c:'+DIRS[o.dir].c+'">'+
+  var mv=!o.at&&!o.parallel&&!o.skipped&&!o.done;
+  return '<div class="item'+(o.done?' done':'')+(o.over?' over':'')+(o.skipped?' done':'')+'"'+
+    ' data-row="'+o.id+'" data-mv="'+(mv?1:0)+'" style="--c:'+DIRS[o.dir].c+'">'+
     '<div class="time">'+time+'</div><div class="bar"></div>'+
     '<div class="mid"><div class="ttl">'+
       '<button class="chk" data-act="toggle" data-id="'+o.id+'">'+IC.check+'</button>'+
@@ -988,6 +1021,7 @@ function itemHTML(o,d){
     (part?'<div class="pbar"><i style="width:'+Math.min(100,o.doneMin/o.min*100)+'%"></i></div>':'')+
     '</div>'+
     '<div class="acts">'+
+      (mv?'<button class="grip" data-act="grab" data-id="'+o.id+'" title="Потяните, чтобы переставить">'+IC.grip+'</button>':'')+
       '<button class="mini'+(run?' run':'')+'" data-act="timer" data-id="'+o.id+'">'+(run?IC.stop:IC.play)+'</button>'+
       '<button class="mini" data-act="menu" data-id="'+o.id+'">'+IC.dots+'</button>'+
     '</div></div>';
@@ -1336,7 +1370,7 @@ function viewSet(){
     '<button class="btn sm" data-act="copyData">Скопировать текстом</button>'+
     '<button class="btn sm danger" data-act="reset">Сбросить всё</button></div>'+
     '<input type="file" id="fileIn" accept="application/json,.json" style="display:none"></div>';
-  h+='<div class="dim" style="font-size:11.5px;text-align:center;margin:18px 0 30px">devnprt.planner · сборка 10, ноябрь 2026 · работает без интернета</div>';
+  h+='<div class="dim" style="font-size:11.5px;text-align:center;margin:18px 0 30px">devnprt.planner · сборка 11, ноябрь 2026 · работает без интернета</div>';
   V.innerHTML=h;
 }
 
@@ -1385,11 +1419,19 @@ function sheetMenu(id){
   var o=p.items.concat(p.over).filter(function(x){return x.id===id})[0];
   if(!o)return;
   var tk=S.tasks.filter(function(x){return x.id===id})[0],once=!!(tk&&tk.date);
+  var mvb=!o.at&&!o.parallel&&!o.done;
   var h='<h3>'+esc(o.title)+'</h3>'+
     '<div class="dim" style="font-size:12px;margin:-9px 0 13px">'+
       (o.virt?'Подстановка вместо пар':(once?'Разовая задача, только на '+dateShort(d):'Повторяется по шаблону недели'))+'</div>'+
     (o.over?'<div class="dim" style="font-size:12px;margin:-6px 0 12px;line-height:1.5;color:var(--warn)">'+overWhy(o)+'</div>':'')+
+    (mvb?'<div class="row-btns" style="margin:0 0 13px">'+
+       '<button class="btn sm" data-act="mvUp" data-id="'+id+'">Выше</button>'+
+       '<button class="btn sm" data-act="mvDn" data-id="'+id+'">Ниже</button>'+
+       '<button class="btn sm" data-act="swapAsk" data-id="'+id+'">Поменять местами</button>'+
+       '</div>':'')+
     '<div class="menu">'+
+    (mvb&&o.s!=null?'<button data-act="pinAt" data-id="'+id+'" data-v="'+m2t(o.s)+'">Закрепить на '+m2t(o.s)+', только сегодня</button>':'')+
+    (o.at&&!o.virt?'<button data-act="unpin" data-id="'+id+'">Открепить, пусть плавает по дню</button>':'')+
     (o.over&&o.why==='late'?'<button data-act="freeAfter" data-id="'+id+'">Разрешить раньше '+o.after+', только сегодня</button>':'')+
     (o.over&&overFit(o)?'<button data-act="fitHere" data-id="'+id+'" data-v="'+overFit(o)+'">Укоротить до '+hm(overFit(o))+' и поставить сегодня</button>':'')+
     '<button data-act="toggle" data-id="'+id+'">'+(o.done?'Снять отметку':'Отметить сделанным')+'</button>'+
@@ -1503,6 +1545,87 @@ function render(to){
 }
 function go(v){if(S.ui.view!==v)SCROLLS[S.ui.view]=window.scrollY;S.ui.view=v;save();render(SCROLLS[v]||0)}
 
+/* ======== перетаскивание блоков: палец, мышь, трекпад ========
+   Правила взяты из планировщиков, где это сделано хорошо:
+   1) блок встаёт туда, куда его отпустили; 2) блоки с точным временем не двигаются;
+   3) соседи расходятся только настолько, насколько нужно; 4) вернул на место значит ничего не изменилось;
+   5) то, что перестало помещаться, не пропадает, а уходит в «не помещается в день». */
+var DRG=null;
+function dragRows(){
+  var V2=document.getElementById('view');
+  return [].slice.call(V2.querySelectorAll('.item[data-row][data-mv="1"]'));
+}
+function dragEnd(){
+  if(DRG&&DRG.row)DRG.row.classList.remove('drag');
+  if(DRG&&DRG.sc)clearInterval(DRG.sc);
+  document.body.classList.remove('dragging');
+  var g=document.getElementById('dragghost'); if(g)g.parentNode.removeChild(g);
+  var l=document.getElementById('dropline'); if(l)l.parentNode.removeChild(l);
+  DRG=null;
+}
+document.addEventListener('pointerdown',function(e){
+  var g=e.target.closest?e.target.closest('[data-act="grab"]'):null;
+  if(!g||DRG)return;
+  var row=document.querySelector('.item[data-row="'+g.dataset.id+'"]');
+  if(!row)return;
+  e.preventDefault();
+  DRG={id:g.dataset.id,row:row,y0:(typeof e.clientY==='number'?e.clientY:0),on:false,before:undefined};
+},{passive:false});
+document.addEventListener('pointermove',function(e){
+  if(!DRG||typeof e.clientY!=='number')return;
+  if(!DRG.on){
+    if(Math.abs(e.clientY-DRG.y0)<5)return;
+    DRG.on=true;
+    DRG.row.classList.add('drag');
+    document.body.classList.add('dragging');
+    var gh=document.createElement('div');
+    gh.id='dragghost';gh.className='ghostrow';
+    var ttl=DRG.row.querySelector('.ttl span');
+    gh.innerHTML='<i style="background:'+(DRG.row.style.getPropertyValue('--c')||'#C2A170')+'"></i>'+(ttl?ttl.textContent:'Блок');
+    document.body.appendChild(gh);
+    var ln=document.createElement('div');ln.id='dropline';ln.className='dropline';
+    document.body.appendChild(ln);
+    DRG.sc=setInterval(function(){
+      if(!DRG||DRG.cy==null)return;
+      var H=window.innerHeight||700;
+      if(DRG.cy<110)window.scrollBy(0,-14);
+      else if(DRG.cy>H-110)window.scrollBy(0,14);
+    },40);
+  }
+  e.preventDefault();
+  DRG.cy=e.clientY;
+  var gh2=document.getElementById('dragghost');
+  if(gh2){gh2.style.left=Math.max(8,(e.clientX||40)-30)+'px';gh2.style.top=(e.clientY-22)+'px'}
+  var rows=dragRows(),ln2=document.getElementById('dropline'),i,tgt=null;
+  for(i=0;i<rows.length;i++){
+    var b=rows[i].getBoundingClientRect();
+    if(e.clientY<b.top+b.height/2){tgt=rows[i];break}
+  }
+  DRG.before=tgt?tgt.getAttribute('data-row'):null;
+  if(ln2){
+    if(tgt)tgt.parentNode.insertBefore(ln2,tgt);
+    else if(rows.length){var last=rows[rows.length-1];last.parentNode.insertBefore(ln2,last.nextSibling)}
+  }
+},{passive:false});
+['pointerup','pointercancel'].forEach(function(ev){
+  document.addEventListener(ev,function(e){
+    if(!DRG)return;
+    var id=DRG.id,before=DRG.before,moved=DRG.on;
+    dragEnd();
+    if(!moved||before===undefined)return;
+    var d=S.ui.date,rows=dayRows(d),ci=rows.indexOf(id);
+    var bi=before?rows.indexOf(before):rows.length;
+    if(ci<0)return;
+    if(bi<0)bi=rows.length;
+    var to=(bi>ci)?bi-1:bi;
+    if(to===ci)return;            /* отпустили там же, где взяли */
+    var snp=snapDay(d),wasD=startOf(d,id),sigD=laySig(d);
+    orderPlace(d,id,before);
+    if(laySig(d)===sigD){ restoreDay(d,snp); toast(moveMsg(d,id,wasD,to>ci?'dn':'up')); return; }
+    save(); render();
+    toast(moveMsg(d,id,wasD,to>ci?'dn':'up'),function(){restoreDay(d,snp)});
+  });
+});
 document.addEventListener('click',function(e){
   var el=e.target.closest('[data-act],[data-pick]');if(!el)return;
   var id=el.dataset.id,v=el.dataset.v,d=S.ui.date,L;
@@ -1600,12 +1723,59 @@ document.addEventListener('click',function(e){
     case 'pickFor': closeSheet(); sheetPick(id); break;
     case 'pickTask': {
       var snapP=snapDay(d);
+      /* место в дне наследуется: замена встаёт туда, где стоял прежний блок,
+         а новая задача при ручном порядке уходит в конец, а не прыгает наверх по приоритету */
+      var seq=(v||hasOrder(d))?freezeOrder(d).slice():null;
       if(v)dropFromDay(v,d);
       var res=putInDay(id,d);
       if(res==='dupfail'&&!v){ closeSheet(); render(); toast('Такой блок уже стоит в дне и не помещается'); break; }
+      if(seq){
+        var nid=LASTPUT||id,no=seq.filter(function(x){return x!==nid}),iv=v?no.indexOf(v):-1;
+        if(iv>=0)no[iv]=nid; else no.push(nid);
+        logOf(d).ord=no;
+      }
       save(); closeSheet(); render();
-      toast(v?'Блок заменён':(res==='copy'?'Поставил ещё один такой блок':'Задача в плане дня'),
+      toast(v?moveMsg(d,LASTPUT||id):(res==='copy'?'Поставил ещё один такой блок':'Задача в плане дня'),
             function(){restoreDay(d,snapP)});
+      break; }
+    case 'grab': break;   /* перетаскивание ведёт отдельный слушатель ниже */
+    case 'mvUp': case 'mvDn': {
+      var rws=dayRows(d),ci=rws.indexOf(id);
+      if(ci<0){toast('Этот блок не двигается');break}
+      var bef;
+      if(a==='mvUp'){ if(ci===0){toast('Это и так первый блок дня');break} bef=rws[ci-1]; }
+      else { if(ci>=rws.length-1){toast('Это и так последний блок дня');break} bef=rws[ci+2]||null; }
+      var snpM=snapDay(d),wasM=startOf(d,id),sigM=laySig(d);
+      orderPlace(d,id,bef);
+      if(laySig(d)===sigM){ restoreDay(d,snpM); closeSheet(); toast(moveMsg(d,id,wasM,a==='mvUp'?'up':'dn')); break; }
+      save(); closeSheet(); render();
+      toast(moveMsg(d,id,wasM,a==='mvUp'?'up':'dn'),function(){restoreDay(d,snpM)});
+      break; }
+    case 'swapAsk': closeSheet(); sheetSwap(id); break;
+    case 'swapDo': {
+      var snpS=snapDay(d),wasS=startOf(d,id),wasV=startOf(d,v),sigS=laySig(d);
+      if(!orderSwap(d,id,v)){toast('Эти блоки местами не меняются');break}
+      if(laySig(d)===sigS){ restoreDay(d,snpS); closeSheet(); toast(moveMsg(d,id,wasS)); break; }
+      save(); closeSheet(); render();
+      var gotS=startOf(d,id),gotV=startOf(d,v);
+      toast((gotS===wasS&&gotV===wasV)?moveMsg(d,id,wasS)
+            :(gotS!=null&&gotV!=null?'Поменял местами: '+m2t(gotS)+' и '+m2t(gotV):moveMsg(d,id,wasS)),
+            function(){restoreDay(d,snpS)});
+      break; }
+    case 'pinAt': {
+      var snpP1=snapDay(d); L=logOf(d); L.ovr[id]=L.ovr[id]||{}; L.ovr[id].at=v;
+      save(); closeSheet(); render();
+      toast('Закреплено на '+v+', только сегодня',function(){restoreDay(d,snpP1)});
+      break; }
+    case 'unpin': {
+      var snpU=snapDay(d); L=logOf(d); L.ovr[id]=L.ovr[id]||{}; L.ovr[id].at='';
+      save(); closeSheet(); render();
+      toast('Блок откреплён, теперь он плавает по дню',function(){restoreDay(d,snpU)});
+      break; }
+    case 'ordReset': {
+      var snpO=snapDay(d); L=logOf(d); delete L.ord;
+      save(); render();
+      toast('Порядок собран заново',function(){restoreDay(d,snpO)});
       break; }
     case 'addToday': closeSheet(); sheetDayTask(); break;
     case 'addDay': {
@@ -1614,6 +1784,7 @@ document.addEventListener('click',function(e){
       var qm=parseInt(document.getElementById('q_min').value,10)||30;
       var qn=T({title:qt,dir:TMP.dir||'sites',min:qm,at:document.getElementById('q_at').value||null,days:[],date:d,ord:20});
       S.tasks.push(qn);
+      if(hasOrder(d))logOf(d).ord.push(qn.id);
       if(TMP.qdone){L=logOf(d);L.done[qn.id]=qm}
       save(); closeSheet(); render();
       toast(TMP.qdone?'Записал как сделанное, '+hm(qm):'Добавлено в '+dateShort(d)); break; }
@@ -1781,6 +1952,60 @@ function sheetDayTask(){
     '<button class="btn ghost" data-act="closeSheet">Отмена</button></div>');
 }
 /* снимок дня для кнопки «Вернуть» в подсказке */
+/* ======== ручной порядок блоков в дне ========
+   L.ord хранит последовательность подвижных блоков ровно так, как человек видит её на экране.
+   Любая перестановка сначала переписывает L.ord с экрана, потом двигает один блок:
+   что видишь, то и переставляешь, соседи остаются на местах. */
+function dayRows(d){
+  var p=planDay(d),out=[];
+  p.items.filter(function(o){return !o.skipped&&!o.done&&!o.at&&!o.parallel&&o.s!=null})
+         .sort(function(a,b){return a.s-b.s})
+         .forEach(function(o){out.push(o.id)});
+  p.over.forEach(function(o){if(!o.parallel&&out.indexOf(o.id)<0)out.push(o.id)});
+  return out;
+}
+function hasOrder(d){var L=S.log[d];return !!(L&&L.ord&&L.ord.length)}
+function freezeOrder(d){
+  var L=logOf(d),now=dayRows(d);
+  /* то, чего сейчас на экране нет (сделанное, убранное), помним в хвосте, чтобы не терять */
+  var old=(L.ord||[]).filter(function(x){return now.indexOf(x)<0});
+  L.ord=now.concat(old);
+  return L.ord;
+}
+/* поставить блок перед указанным; before=null значит в самый конец */
+function orderPlace(d,id,before){
+  var o=freezeOrder(d).filter(function(x){return x!==id});
+  var i=before?o.indexOf(before):-1;
+  if(i<0)o.push(id); else o.splice(i,0,id);
+  logOf(d).ord=o;
+  return o;
+}
+function orderSwap(d,a,b){
+  var o=freezeOrder(d),ia=o.indexOf(a),ib=o.indexOf(b);
+  if(ia<0||ib<0)return false;
+  o[ia]=b;o[ib]=a;return true;
+}
+/* куда блок встал после перестановки: говорим человеку результат, а не «готово» */
+function moveMsg(d,id,was,dir){
+  var p=planDay(d),o=p.items.concat(p.over).filter(function(x){return x.id===id})[0];
+  if(!o)return 'Порядок изменён';
+  var nm=o.title.split(',')[0];
+  if(o.s==null)return nm+': на этом месте блок в день не помещается';
+  if(was!=null&&o.s===was){
+    var side=(dir==='dn')?'позже':'раньше';
+    if(o.after&&dir!=='dn')return nm+' остался в '+m2t(o.s)+': раньше '+o.after+' его ставить нельзя';
+    return nm+' остался в '+m2t(o.s)+': '+side+' в дне нет свободного окна на '+hm(o.min);
+  }
+  return nm+' теперь в '+m2t(o.s);
+}
+/* слепок раскладки: по нему видно, изменила ли перестановка хоть что-то */
+function laySig(d){
+  var p=planDay(d);
+  return p.items.filter(function(o){return !o.skipped}).concat(p.over)
+    .map(function(o){return o.id+':'+(o.s==null?'x':o.s)}).sort().join('|');
+}
+/* время начала блока до перестановки, чтобы честно сказать результат */
+function startOf(d,id){var o=planDay(d).items.concat(planDay(d).over).filter(function(x){return x.id===id})[0];return o?o.s:null}
 function snapDay(d){return JSON.stringify({l:S.log[d]||null,t:S.tasks})}
 function restoreDay(d,snap){
   var o=JSON.parse(snap);
@@ -1797,8 +2022,10 @@ function dropFromDay(id,d){
   return 'skip';
 }
 /* поставить готовую задачу в день, в том числе второй раз за день */
+var LASTPUT=null;
 function putInDay(tid,d){
   var L=logOf(d),t=S.tasks.filter(function(x){return x.id===tid})[0];
+  LASTPUT=tid;
   if(!t)return null;
   var si=L.skip.indexOf(tid);
   if(si>=0){L.skip.splice(si,1);return 'back'}
@@ -1814,7 +2041,28 @@ function putInDay(tid,d){
            ord:(typeof t.ord==='number'?t.ord:50)});
   if(typeof t.gap==='number')c.gap=t.gap;
   S.tasks.push(c);
+  LASTPUT=c.id;
   return 'copy';
+}
+function sheetSwap(id){
+  var d=S.ui.date,p=planDay(d),me=p.items.concat(p.over).filter(function(x){return x.id===id})[0];
+  if(!me)return;
+  var list=p.items.filter(function(x){return !x.skipped&&!x.done&&!x.at&&!x.parallel&&x.id!==id})
+          .sort(function(a,b){return (a.s==null?99999:a.s)-(b.s==null?99999:b.s)})
+          .concat(p.over.filter(function(x){return !x.parallel&&x.id!==id}));
+  var h='<h3>Поменять местами</h3>'+
+    '<div class="dim" style="font-size:12.5px;margin:-9px 0 13px">«'+esc(me.title.split(',')[0])+
+    '» займёт место выбранного блока, а он встанет на её место. Только на '+dateShort(d)+'.</div>';
+  if(!list.length)h+='<div class="dim" style="padding:2px 2px 12px;font-size:13px">В этом дне больше нет блоков, которые можно двигать.</div>';
+  else h+='<div class="picklist">'+list.map(function(o){
+      return '<button class="pickrow" data-act="swapDo" data-id="'+id+'" data-v="'+o.id+'">'+
+        '<i style="background:'+DIRS[o.dir].c+'"></i>'+
+        '<span class="pn">'+esc(o.title)+'<i class="sub">'+
+          (o.s!=null?m2t(o.s)+' – '+m2t(o.e):'сейчас не помещается в день')+'</i></span>'+
+        '<span class="pm">'+hm(o.min)+'</span></button>';
+    }).join('')+'</div>';
+  h+='<div class="row-btns" style="margin-top:14px"><button class="btn ghost" data-act="closeSheet">Отмена</button></div>';
+  openSheet(h);
 }
 function sheetPick(rep){
   var d=S.ui.date,L=logOf(d),p=planDay(d);
