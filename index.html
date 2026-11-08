@@ -269,6 +269,11 @@ textarea{min-height:64px;resize:vertical}
 .seg{display:flex;gap:5px;flex-wrap:wrap}
 .seg button{border:1px solid var(--line);border-radius:9px;padding:8px 11px;font-size:13px;color:var(--dim);background:var(--panel2)}
 .seg button.on{color:var(--fg);border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:var(--accSoft)}
+.why{display:inline-flex;align-items:center;gap:6px;margin-top:3px;padding:0;border:0;background:none;color:var(--dim);font-size:12.5px;text-align:left;line-height:1.4}
+.why i{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;flex:0 0 15px;border:1px solid var(--line);border-radius:50%;font-style:normal;font-size:10px;color:var(--dim)}
+.seg.wrap button{display:inline-flex;align-items:center;gap:6px}
+.cdot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.days button.on{color:var(--fg);border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:var(--accSoft)}
 .days{display:flex;gap:5px}
 .days button{flex:1;padding:9px 0;border:1px solid var(--line);border-radius:9px;font-size:12.5px;color:var(--dim);background:var(--panel2)}
 .days button.on{color:var(--fg);border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:var(--accSoft)}
@@ -365,7 +370,7 @@ body.lock{position:fixed;left:0;right:0;width:100%;overflow:hidden}
 <header class="top"><div class="top-in">
   <div class="brand mobonly"><b>devnprt</b><span>.planner</span></div>
   <div class="top-sp"></div>
-  <button class="chip" data-act="mode" id="modeChip"></button>
+  <button class="chip" data-act="aheadWhy" id="modeChip"></button>
   <button class="iconbtn" data-act="go" data-v="set" title="Настройки">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>
   </button>
@@ -384,10 +389,8 @@ body.lock{position:fixed;left:0;right:0;width:100%;overflow:hidden}
 var KEY='devnprt.planner.v1', MEM=null;
 function load(){try{var s=localStorage.getItem(KEY);return s?JSON.parse(s):null}catch(e){return MEM}}
 function prune(){
-  for(var d in S.log){var L=S.log[d];
-    var e=(!L.done||!Object.keys(L.done).length)&&(!L.skip||!L.skip.length)&&(!L.ovr||!Object.keys(L.ovr).length)&&
-          (!L.add||!L.add.length)&&(!L.ord||!Object.keys(L.ord).length)&&!L.shield;
-    if(e)delete S.log[d];}
+  if(S.log)for(var d in S.log){if(!S.log[d]||!S.log[d].shield)delete S.log[d]}
+  if(S.items)for(var k in S.items){if(!S.items[k]||!S.items[k].length)delete S.items[k]}
 }
 function save(){try{prune();localStorage.setItem(KEY,JSON.stringify(S))}catch(e){MEM=S}}
 var uid=function(){return Math.random().toString(36).slice(2,9)};
@@ -415,290 +418,240 @@ var WDS=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 var dateLong=function(s){var d=prs(s);return WDL[wday(s)-1]+', '+d.getDate()+' '+MONTH[d.getMonth()]};
 var dateShort=function(s){var d=prs(s);return d.getDate()+' '+MONTH[d.getMonth()].slice(0,3)};
 var esc=function(t){return String(t==null?'':t).replace(/[&<>"]/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]})};
-var DIRS={
-  android:{t:'Android',c:'var(--android)'}, sites:{t:'Сайты',c:'var(--sites)'},
-  pdd:{t:'Права',c:'var(--pdd)'}, content:{t:'Контент',c:'var(--content)'},
-  study:{t:'ТИСБИ',c:'var(--study)'}, body:{t:'Тело',c:'var(--body)'}, life:{t:'Прочее',c:'var(--life)'}
-};
-var DKEYS=['android','sites','pdd','content','study','body','life'];
+/* ============================ категории ============================ */
+var BASECATS=[
+  {id:'android',name:'Android',color:'#7FB7A3'},
+  {id:'sites',name:'Сайты',color:'#C2A170'},
+  {id:'pdd',name:'Права',color:'#8FA2C8'},
+  {id:'content',name:'Контент',color:'#C98F86'},
+  {id:'study',name:'ТИСБИ',color:'#9D93B8'},
+  {id:'body',name:'Тело',color:'#A9B08E'},
+  {id:'life',name:'Прочее',color:'#8A8A90'}
+];
+var PALETTE=['#C2A170','#7FB7A3','#8FA2C8','#C98F86','#9D93B8','#A9B08E','#8A8A90','#D2A3A3','#86B3C9','#BBA77F'];
+function cats(){ if(!S.cats||!S.cats.length)S.cats=JSON.parse(JSON.stringify(BASECATS)); return S.cats }
+function catOf(k){var c=cats().filter(function(x){return x.id===k})[0];return c||{id:k||'life',name:'Прочее',color:'#8A8A90'}}
+function catName(k){return catOf(k).name}
+function catColor(k){return catOf(k).color}
+function catKeys(){return cats().map(function(c){return c.id})}
 
-/* ============================ defaults ============================ */
-function T(o){
-  var b={id:uid(),title:'',dir:'sites',min:60,fix:false,at:null,atA:null,ord:500,
-         days:[1,2,3,4,5],weeks:'all',date:null,with:[],
-         core:false,note:'',active:true,only:null,minA:null,daysA:null,optional:false};
+/* ============================ дела дня ============================
+   Дело живёт в своём дне. Правка меняет только этот день.
+   Повтор и копии создают отдельные дела в других днях. */
+function I(o){
+  var b={id:uid(),title:'',dir:'sites',min:60,ord:500,at:null,with:[],note:'',
+         core:false,optional:false,done:0,skip:false,rep:null};
   for(var k in o)b[k]=o[k];
   if(!b.with)b.with=[];
-  if(b.fix&&!b.at)b.at='12:00';
+  if(!b.at)b.at=null;
   return b;
 }
-/* дни, где две метки времени спорят друг с другом: двигаем только их.
-   Всё остальное день раскладывает сам, по порядку задач. */
-var DAYFIX={
-  '2026-11-09':{'t-lunch':{at:'14:10'}},
-  '2026-11-15':{'t-dinner':{at:'17:30'}}
-};
-var DAYFIX_NOTE={'2026-11-07':'вождение 15:00',
-  '2026-11-09':'собеседование 12:00, обед сдвинут',
-  '2026-11-14':'вождение 8:00, пары закрыты практикой',
-  '2026-11-15':'вождение 19:00, ужин раньше'};
+function dayList(d){ if(!S.items)S.items={}; return S.items[d]||[] }
+function dayListW(d){ if(!S.items)S.items={}; if(!S.items[d])S.items[d]=[]; return S.items[d] }
+function findItem(d,id){var a=dayList(d),i;for(i=0;i<a.length;i++)if(a[i].id===id)return a[i];return null}
+function addItem(d,o){var a=dayListW(d),it=I(o);a.push(it);return it}
+function delItem(d,id){
+  if(!S.items||!S.items[d])return false;
+  S.items[d]=S.items[d].filter(function(x){return x.id!==id});
+  S.items[d].forEach(function(x){x.with=(x.with||[]).filter(function(w){return w!==id})});
+  if(!S.items[d].length)delete S.items[d];
+  return true;
+}
+function cloneItem(t,keepLinks){
+  var c=JSON.parse(JSON.stringify(t));
+  c.id=uid(); c.done=0; c.skip=false;
+  if(!keepLinks)c.with=[];
+  return c;
+}
+/* дни, в которых вообще что-то есть */
+function dayKeys(){ if(!S.items)S.items={}; return Object.keys(S.items).sort() }
+function lastDay(){var k=dayKeys();return k.length?k[k.length-1]:null}
+function monthEnd(s){var p=prs(s);return iso(new Date(p.getFullYear(),p.getMonth()+1,0))}
+function monthStart(s){var p=prs(s);return iso(new Date(p.getFullYear(),p.getMonth(),1))}
+
+/* ============================ стартовое наполнение ============================
+   Используется один раз: при первом запуске и при переносе старых данных. */
+var STARTER=[
+  {k:'morning',title:'Подъём, душ, завтрак',dir:'life',min:35,ord:10,at:'06:00',days:[1,2,3,4,5,6,7]},
+  {k:'tisbi-mon',title:'ТИСБИ, пары',dir:'study',min:170,ord:120,at:'08:00',days:[1],optional:true,
+   note:'Дистант: ходить необязательно, практику всё равно сдавать'},
+  {k:'tisbi-odd',title:'ТИСБИ, пары',dir:'study',min:260,ord:120,at:'08:00',days:[6],weeks:'odd',optional:true,
+   note:'Нечётная неделя: 8:00 до 12:20'},
+  {k:'tisbi-even',title:'ТИСБИ, пары',dir:'study',min:170,ord:120,at:'09:30',days:[6],weeks:'even',optional:true,
+   note:'Чётная неделя: 9:30 до 12:20'},
+  {k:'lunch',title:'Обед',dir:'life',min:30,ord:400,at:'12:40',days:[1,2,3,4,5,6,7]},
+  {k:'dinner',title:'Ужин',dir:'life',min:30,ord:650,at:'19:00',days:[1,2,3,4,5,6,7]},
+  {k:'gym',title:'Зал',dir:'body',min:90,ord:800,at:'20:50',days:[2,4,6],
+   note:'Минимум полтора часа вместе с дорогой и душем'},
+  {k:'sites1',title:'Ответы и поиск клиентов',dir:'sites',min:60,ord:200,days:[1,2,3,4,5,6],core:true,
+   note:'Сначала ответы по переписке, потом новые адресаты'},
+  {k:'android1',title:'Android, основной блок',dir:'android',min:90,ord:250,days:[1,2,3,4,5,6,7],core:true,
+   note:'Свежая голова: первый заход не меньше полутора часов'},
+  {k:'sites2',title:'Разработка сайта',dir:'sites',min:150,ord:450,days:[1,2,3,4]},
+  {k:'shoot',title:'Съёмка',dir:'content',min:90,ord:470,days:[5]},
+  {k:'pract',title:'Практика по дистанту',dir:'study',min:90,ord:480,days:[7],
+   note:'Задачи ТИСБИ, без привязки к парам'},
+  {k:'android2',title:'Android, практика',dir:'android',min:120,ord:520,days:[3,4,5,6],
+   note:'Второй заход: практика, разбор ошибок, свой проект'},
+  {k:'edit',title:'Монтаж ролика',dir:'content',min:120,ord:560,days:[7]},
+  {k:'loc',title:'Поиск локации и референсов',dir:'content',min:60,ord:600,days:[2]},
+  {k:'pdd1',title:'ПДД, билеты',dir:'pdd',min:60,ord:700,days:[1,2,3,4,5,6,7],core:true},
+  {k:'pdd2',title:'ПДД, разбор на ходу',dir:'pdd',min:40,ord:810,days:[2,4,6],with:['gym'],
+   note:'Вместе с залом: билеты между подходами, теория на кардио'},
+  {k:'insta',title:'Инстаграм: сторис, ответы, публикация',dir:'content',min:20,ord:900,days:[1,2,3,4,5,6,7]}
+];
+var ONCE=[
+  {date:'2026-11-07',title:'Вождение',dir:'pdd',min:120,ord:300,at:'15:00'},
+  {date:'2026-11-09',title:'Собеседование, Альфа-банк',dir:'life',min:120,ord:300,at:'12:00',
+   note:'С запасом на дорогу, после собеседования день продолжается'},
+  {date:'2026-11-14',title:'Вождение',dir:'pdd',min:120,ord:300,at:'08:00'},
+  {date:'2026-11-15',title:'Вождение',dir:'pdd',min:120,ord:300,at:'19:00'}
+];
+/* дни, где стартовое расписание само подвинуто или снято */
+var SEEDSKIP={'2026-11-14':['tisbi-odd']};
+var SEEDAT={'2026-11-09':{lunch:'14:10'},'2026-11-15':{dinner:'17:30'}};
+var ODDBASE={serial:wserial('2026-11-02'),odd:false};
+function oddWeek(d){return (Math.abs(wserial(d)-ODDBASE.serial)%2===0)?ODDBASE.odd:!ODDBASE.odd}
+/* разложить стартовый набор в один день */
+function seedDay(d){
+  var wd=wday(d),odd=oddWeek(d),made={},list=dayListW(d);
+  var skip=SEEDSKIP[d]||[],at=SEEDAT[d]||{};
+  STARTER.forEach(function(r){
+    if(r.days.indexOf(wd)<0)return;
+    if(r.weeks==='odd'&&!odd)return;
+    if(r.weeks==='even'&&odd)return;
+    if(skip.indexOf(r.k)>=0)return;
+    if(list.some(function(x){return x.rep==='r-'+r.k}))return;
+    var it=I({title:r.title,dir:r.dir,min:r.min,ord:r.ord,at:(at[r.k]||r.at||null),
+              note:r.note||'',core:!!r.core,optional:!!r.optional,rep:'r-'+r.k});
+    list.push(it); made[r.k]=it;
+  });
+  STARTER.forEach(function(r){
+    if(!made[r.k]||!r.with)return;
+    r.with.forEach(function(w){
+      var o=made[w]; if(!o)return;
+      if(made[r.k].with.indexOf(o.id)<0)made[r.k].with.push(o.id);
+      if(o.with.indexOf(made[r.k].id)<0)o.with.push(made[r.k].id);
+    });
+  });
+  ONCE.forEach(function(r){
+    if(r.date!==d)return;
+    if(list.some(function(x){return x.title===r.title&&x.at===r.at}))return;
+    list.push(I({title:r.title,dir:r.dir,min:r.min,ord:r.ord,at:r.at||null,note:r.note||''}));
+  });
+  if(!list.length)delete S.items[d];
+  return list.length;
+}
+function seedRange(from,to){var d=from,n=0;while(d<=to){n+=seedDay(d)?1:0;d=addD(d,1)}return n}
+
+/* ============================ начальное состояние ============================ */
 function defaults(){
   var t=todayIso();
-  return {
-    v:6,
-    settings:{mode:'B',wake:'06:00',sleep:'23:00',theme:'dark',goal:60000,
-      parity:{serial:wserial('2026-11-02'),odd:false},
-      norms:{B:{android:19,sites:16,pdd:12,content:7,body:4.5},A:{android:12,sites:6,pdd:8,content:3,body:3}}},
-    tasks:[
-      /* --- метки времени: внешние события, еда и зал --- */
-      T({id:'t-morning',title:'Подъём, душ, завтрак',dir:'life',min:35,ord:10,fix:true,at:'06:00',days:[1,2,3,4,5,6,7]}),
-      T({id:'tisbi-mon',title:'ТИСБИ, пары',dir:'study',min:170,ord:120,fix:true,at:'08:00',days:[1],weeks:'all',optional:true,note:'Дистант: ходить необязательно, практику всё равно сдавать'}),
-      T({id:'tisbi-sat-odd',title:'ТИСБИ, пары',dir:'study',min:260,ord:120,fix:true,at:'08:00',days:[6],weeks:'odd',optional:true,note:'Нечётная неделя: 8:00 до 12:20'}),
-      T({id:'tisbi-sat-even',title:'ТИСБИ, пары',dir:'study',min:170,ord:120,fix:true,at:'09:30',days:[6],weeks:'even',optional:true,note:'Чётная неделя: 9:30 до 12:20'}),
-      T({id:'t-road1',title:'Дорога на работу',dir:'life',min:30,ord:150,fix:true,at:'08:30',days:[2,3,4,5],only:'A'}),
-      T({id:'t-bank',title:'Работа в банке',dir:'life',min:720,ord:160,fix:true,at:'09:00',days:[2,3,4,5],only:'A',note:'Вторник до пятницы, 9:00 до 21:00'}),
-      T({id:'t-lunch',title:'Обед',dir:'life',min:30,minA:30,ord:400,fix:true,at:'12:40',atA:'12:40',days:[1,2,3,4,5,6,7],daysA:[1,6,7]}),
-      T({id:'t-dinner',title:'Ужин',dir:'life',min:30,minA:30,ord:650,fix:true,at:'19:00',atA:'21:40',days:[1,2,3,4,5,6,7],daysA:[1,2,3,4,5,6,7]}),
-      T({id:'t-road2',title:'Дорога домой',dir:'life',min:30,ord:850,fix:true,at:'21:00',days:[2,3,4,5],only:'A',with:['t-pdd3']}),
-      T({id:'t-gym',title:'Зал',dir:'body',min:90,minA:90,ord:800,fix:true,at:'20:50',atA:'17:40',days:[2,4,6],daysA:[1,6],with:['t-pdd2'],note:'Минимум полтора часа вместе с дорогой и душем'}),
-      T({title:'Собеседование, Альфа-банк',dir:'life',min:120,ord:300,fix:true,at:'12:00',date:'2026-11-09',days:[],note:'С запасом на дорогу, после собеседования день продолжается'}),
-      T({title:'Вождение',dir:'pdd',min:120,ord:300,fix:true,at:'15:00',date:'2026-11-07',days:[]}),
-      T({title:'Вождение',dir:'pdd',min:120,ord:300,fix:true,at:'08:00',date:'2026-11-14',days:[]}),
-      T({title:'Вождение',dir:'pdd',min:120,ord:300,fix:true,at:'19:00',date:'2026-11-15',days:[]}),
-      /* --- свободный порядок: идут подряд и обходят метки --- */
-      T({id:'t-sites1',title:'Ответы и поиск клиентов',dir:'sites',min:60,minA:30,ord:200,days:[1,2,3,4,5,6],daysA:[1,2,3,4,5,6,7],core:true,note:'Сначала ответы по переписке, потом новые адресаты'}),
-      T({id:'t-android1',title:'Android, основной блок',dir:'android',min:90,minA:60,ord:250,days:[2,3,4,5,7],daysA:[2,3,4,5,7],core:true,note:'Свежая голова: в полный день полтора часа, в день со сменой час'}),
-      T({id:'t-android1s',title:'Android, основной блок',dir:'android',min:90,minA:60,ord:250,days:[1,6],daysA:[1,6],core:true,note:'В дни пар этот блок идёт после учёбы'}),
-      T({id:'t-sites2',title:'Разработка сайта',dir:'sites',min:150,minA:150,ord:450,days:[1,2],daysA:[1]}),
-      T({id:'t-sites2b',title:'Разработка сайта',dir:'sites',min:150,minA:150,ord:450,days:[3,4],daysA:[],note:'В среду и четверг сайт идёт сразу после обеда'}),
-      T({id:'t-shoot',title:'Съёмка',dir:'content',min:90,minA:0,ord:470,days:[5]}),
-      T({id:'t-pract',title:'Практика по дистанту',dir:'study',min:90,minA:60,ord:480,days:[7],daysA:[7],note:'Задачи ТИСБИ, без привязки к парам'}),
-      T({id:'t-android2',title:'Android, практика',dir:'android',min:120,minA:90,ord:520,days:[3,4,5,6],daysA:[6],note:'Второй заход: практика, разбор ошибок, свой проект'}),
-      T({id:'t-edit',title:'Монтаж ролика',dir:'content',min:120,minA:120,ord:560,days:[7],daysA:[7]}),
-      T({id:'t-loc',title:'Поиск локации и референсов',dir:'content',min:60,minA:0,ord:600,days:[2]}),
-      T({id:'t-pdd1',title:'ПДД, билеты',dir:'pdd',min:60,minA:30,ord:700,days:[1,2,3,4,5,6,7],daysA:[1,6,7],core:true}),
-      T({id:'t-pdd2',title:'ПДД, разбор на ходу',dir:'pdd',min:40,minA:40,ord:800,days:[2,4,6],daysA:[1,6],with:['t-gym'],note:'Вместе с залом: билеты между подходами, теория на кардио'}),
-      T({id:'t-pdd3',title:'ПДД, повторение в дороге',dir:'pdd',min:30,minA:30,ord:850,days:[2,3,4,5],only:'A',with:['t-road2'],note:'Вместе с дорогой домой'}),
-      T({id:'t-insta',title:'Инстаграм: сторис, ответы, публикация',dir:'content',min:20,minA:20,ord:900,days:[1,2,3,4,5,6,7],daysA:[1,6,7]})
-    ],
-    log:(function(){var L={},k;for(k in DAYFIX_NOTE)L[k]={done:{},skip:(k==='2026-11-14'?['tisbi-sat-odd']:[]),
-          ovr:(DAYFIX[k]?JSON.parse(JSON.stringify(DAYFIX[k])):{}),note:DAYFIX_NOTE[k]||''};return L})(),
-    clients:[], reels:[], income:[], shield:{}, ui:{view:'day',date:t,week:monday(t),timer:null}
-  };
+  var st={ v:7,
+    settings:{wake:'06:00',sleep:'23:00',theme:'dark',goal:60000},
+    cats:JSON.parse(JSON.stringify(BASECATS)),
+    items:{}, log:{}, clients:[], reels:[], income:[], shield:{},
+    ui:{view:'day',date:t,week:monday(t),timer:null} };
+  var keep=(typeof S!=='undefined')?S:null;
+  S=st; seedRange(monthStart(t),monthEnd(t)); S=keep||st;
+  return st;
 }
 var S=load();
-if(!S||!S.tasks){S=defaults();save()}
-/* --- перенос на новую модель дня, выполняется один раз --- */
-(function migrate(){
-  if((S.v||1)>=2)return;
-  var D=defaults(),FIELDS=['title','dir','min','minA','days','daysA','at','atA','weeks','only','core','optional','par','note'];
-  var OLD={'Android, глубокий блок':'t-android1','Android, второй блок':'t-android2',
-           'Ответы и поиск клиентов':'t-sites1','Разработка сайта':'t-sites2','Практика по дистанту':'t-pract',
-           'Поиск локации и референсов':'t-loc','Съёмка':'t-shoot','Монтаж ролика':'t-edit',
-           'ПДД, билеты':'t-pdd1','Зал':'t-gym','ПДД, разбор на ходу':'t-pdd2',
-           'Инстаграм: сторис, ответы, публикация':'t-insta','Работа в банке':'t-bank'};
-  S.tasks.forEach(function(t){if(t.active===undefined)t.active=true});
-  /* вождение 13 ноября отменено */
-  S.tasks=S.tasks.filter(function(t){return !(t.date==='2026-11-13'&&t.title==='Вождение')});
-  D.tasks.forEach(function(ft){
-    if(ft.date)return;
-    var ex=null,i;
-    for(i=0;i<S.tasks.length;i++){
-      var t=S.tasks[i];
-      if(t.date)continue;
-      if(t.id===ft.id){ex=t;break}
-      if(OLD[t.title]===ft.id&&!t._m){ex=t;break}
-      if(t.title===ft.title&&t.at===ft.at&&!t._m){ex=t;break}
-    }
-    if(ex){ex._m=1;FIELDS.forEach(function(k){ex[k]=ft[k]})}
-    else S.tasks.push(ft);
-  });
-  S.tasks.forEach(function(t){delete t._m});
-  if(S.settings){
-    if(S.settings.wake==='07:30')S.settings.wake='06:00';
-    if(S.settings.sleep==='23:30')S.settings.sleep='23:00';
-    S.settings.norms=D.settings.norms;
-  }
-  S.v=2;save();
-})();
-if(!Array.isArray(S.income)){S.income=[];S.v=3;save()}
-/* --- переход на порядок дня: время остаётся только там, где оно действительно нужно --- */
-(function migrate6(){
-  if((S.v||1)>=6)return;
-  var D=defaults(),TPL={},byId={};
-  D.tasks.forEach(function(t){if(t.id&&!t.date)TPL[t.id]=t});
-  S.tasks.forEach(function(t){byId[t.id]=t});
-  S.tasks.forEach(function(t){
-    var ref=TPL[t.id];
-    if(ref){ t.ord=ref.ord; t.fix=ref.fix; t.at=ref.at; t.atA=ref.atA; t.with=(ref.with||[]).slice(); }
-    else{
-      t.ord=(typeof t.ord==='number')?t.ord:(t.at?t2m(t.at):500);
-      /* разовое событие держит свой час, обычная задача становится свободной */
-      t.fix=!!t.date;
-      if(!t.fix)t.at=null;
-      var w=[];
-      if(t.par&&byId[t.par])w.push(t.par);
-      t.with=w;
-    }
-    delete t.par;
-  });
-  /* связи «вместе» обоюдные */
-  S.tasks.forEach(function(t){(t.with||[]).forEach(function(w){
-    var o=byId[w]; if(!o)return; o.with=o.with||[];
-    if(o.with.indexOf(t.id)<0)o.with.push(t.id);
-  })});
-  /* в журнале чистим времена у дел без метки, порядок дня начинаем с чистого листа */
-  for(var dk in S.log){
-    var L=S.log[dk];
-    delete L.ord;
-    if(L.ovr)for(var ok in L.ovr){
-      var rt=byId[ok];
-      if(!rt||!rt.fix)delete L.ovr[ok].at;
-      if(!L.ovr[ok].at&&!L.ovr[ok].min)delete L.ovr[ok];
-    }
-  }
-  for(var fk in DAYFIX){
-    if(fk<todayIso())continue;
-    var Lf=logOf(fk);
-    for(var fi in DAYFIX[fk])Lf.ovr[fi]=JSON.parse(JSON.stringify(DAYFIX[fk][fi]));
-  }
-  S.v=6;save();
-})();
-/* ===== сборка недели по схеме =====
-   Чинит состояние любого возраста: ставит времена схемы, убирает мусор прежних версий,
-   раскладывает дни с жёсткими событиями. Вызывается при переезде и кнопкой в настройках. */
-function rebuildSchedule(){
-  var D=defaults(),TPL={},KEEP=['at','atA','fix','ord','days','daysA','min','minA','with','only','core','optional','note','dir','title'];
-  D.tasks.forEach(function(t){if(t.id&&!t.date)TPL[t.id]=t});
-  /* 1. дела схемы обновляются целиком: длительность, порядок, метка времени и дни */
-  S.tasks.forEach(function(t){
-    var ref=TPL[t.id];
-    if(ref)KEEP.forEach(function(f){t[f]=(ref[f]&&typeof ref[f]==='object')?JSON.parse(JSON.stringify(ref[f])):ref[f]});
-    delete t.after;delete t.floor;delete t.gap;delete t.par;
-    if(!t.with)t.with=[];
-  });
-  var renameId=function(a,b){
-    for(var dk in S.log){var L=S.log[dk];
-      if(L.done&&L.done[a]!=null){L.done[b]=L.done[a];delete L.done[a]}
-      if(L.ovr&&L.ovr[a]){L.ovr[b]=L.ovr[a];delete L.ovr[a]}
-      if(L.ord&&L.ord[a]!=null){L.ord[b]=L.ord[a];delete L.ord[a]}
-      if(L.skip){var i=L.skip.indexOf(a);if(i>=0)L.skip[i]=b}
-      if(L.add){var j=L.add.indexOf(a);if(j>=0)L.add[j]=b}
-    }
-  };
-  Object.keys(TPL).forEach(function(id){
-    if(S.tasks.some(function(t){return t.id===id}))return;
-    var ref=TPL[id];
-    /* прежние версии хранили часть дел со случайным ключом: узнаём по названию и неделям */
-    var cand=S.tasks.filter(function(t){return !t.date&&!TPL[t.id]&&t.title===ref.title&&(t.weeks||'all')===(ref.weeks||'all')});
-    var same=cand.filter(function(t){return String((t.days||[]).join())===String((ref.days||[]).join())})[0]||cand[0];
-    if(same){
-      renameId(same.id,id); same.id=id;
-      KEEP.forEach(function(f){same[f]=(ref[f]&&typeof ref[f]==='object')?JSON.parse(JSON.stringify(ref[f])):ref[f]});
-    } else S.tasks.push(JSON.parse(JSON.stringify(ref)));
-  });
-  /* 2. журнал: следы прежних версий и закрепления времени на сегодня и дальше */
-  var byId={};S.tasks.forEach(function(t){byId[t.id]=t});
-  for(var dk in S.log){var Lg=S.log[dk];
-    delete Lg.shape;delete Lg.focus;
-    if(dk>=todayIso())delete Lg.ord;
-    if(Lg.ovr)for(var ok in Lg.ovr){
-      delete Lg.ovr[ok].after;delete Lg.ovr[ok].floor;delete Lg.ovr[ok].gap;
-      var ref2=byId[ok];
-      if(!ref2||!ref2.fix||dk>=todayIso())delete Lg.ovr[ok].at;
-      if(!Lg.ovr[ok].at&&!Lg.ovr[ok].min)delete Lg.ovr[ok];
-    }
-  }
-  if(S.settings){delete S.settings.brk;delete S.settings.breaks}
-  /* 3. дни, где две метки спорят друг с другом */
-  for(var fk in DAYFIX){
-    if(fk<todayIso())continue;
-    var Lf=logOf(fk);
-    for(var fi in DAYFIX[fk])Lf.ovr[fi]=JSON.parse(JSON.stringify(DAYFIX[fk][fi]));
-  }
-  /* 4. свои задачи: порядок по месту в дне, связи «вместе» делаем обоюдными */
-  S.tasks.forEach(function(t){
-    if(typeof t.ord!=='number')t.ord=t.at?t2m(t.at):500;
-    if(!t.fix)t.at=t.at||null;
-    (t.with||[]).forEach(function(w){
-      var o=byId[w]; if(!o)return;
-      o.with=o.with||[];
-      if(o.with.indexOf(t.id)<0)o.with.push(t.id);
-    });
-    t.with=(t.with||[]).filter(function(w){return byId[w]&&w!==t.id});
-  });
-}
-function isOdd(d){var p=S.settings.parity;return (Math.abs(wserial(d)-p.serial)%2===0)?p.odd:!p.odd}
-function logOf(d){if(!S.log[d])S.log[d]={};var L=S.log[d];L.done=L.done||{};L.skip=L.skip||[];L.ovr=L.ovr||{};L.add=L.add||[];return L}
-function instances(d){
-  var L=logOf(d),wd=wday(d),odd=isOdd(d),mode=S.settings.mode,out=[],i,t,ADD=L.add||[];
-  for(i=0;i<S.tasks.length;i++){
-    t=S.tasks[i];
-    if(!t.active)continue;
-    /* задача, поставленную в этот день вручную, берём независимо от дней недели и режима */
-    if(ADD.indexOf(t.id)<0){
-      if(t.only&&t.only!==mode)continue;
-      if(t.date){ if(t.date!==d)continue; }
-      else{
-        var dd=(mode==='A'&&t.daysA)?t.daysA:t.days;
-        if(!dd||dd.indexOf(wd)<0)continue;
-        if(t.weeks==='odd'&&!odd)continue;
-        if(t.weeks==='even'&&odd)continue;
+if(!S||(!S.items&&!S.tasks)){S=null;S=defaults();save()}
+else if(S.items&&!Object.keys(S.items).length&&(S.v||1)>=7){var _t0=todayIso();seedRange(monthStart(_t0),monthEnd(_t0));save()}
+
+/* ===== перенос старого хранилища (версии 1-6) в дела по дням ===== */
+(function migrate7(){
+  if(!S||(S.v||1)>=7)return;
+  var old=S,mode=(old.settings&&old.settings.mode)||'B';
+  var tasks=old.tasks||[],log=old.log||{};
+  var parity=(old.settings&&old.settings.parity)||{serial:wserial('2026-11-02'),odd:false};
+  var wasOdd=function(d){return (Math.abs(wserial(d)-parity.serial)%2===0)?parity.odd:!parity.odd};
+  /* старый расчёт: какие задачи попадали в день */
+  var oldDay=function(d){
+    var wd=wday(d),odd=wasOdd(d),L=log[d]||{},add=L.add||[],skip=L.skip||[],ovr=L.ovr||{},out=[];
+    tasks.forEach(function(t){
+      if(t.active===false)return;
+      var inDay=(add.indexOf(t.id)>=0);
+      if(!inDay){
+        if(t.only&&t.only!==mode)return;
+        if(t.date){ if(t.date!==d)return; }
+        else{
+          var dd=(mode==='A'&&t.daysA)?t.daysA:t.days;
+          if(!dd||dd.indexOf(wd)<0)return;
+          if(t.weeks==='odd'&&!odd)return;
+          if(t.weeks==='even'&&odd)return;
+        }
       }
+      var mn=(mode==='A'&&typeof t.minA==='number')?t.minA:t.min;
+      if(!(mn>0))return;
+      var at=(mode==='A'&&t.atA)?t.atA:t.at;
+      var fix=!!t.fix, ov=ovr[t.id];
+      if(ov){ if(ov.min)mn=ov.min; if(ov.fixDay&&ov.at){fix=true;at=ov.at} else if(ov.at&&fix)at=ov.at; }
+      out.push({src:t.id,title:t.title,dir:t.dir,min:mn,at:fix&&at?at:null,
+        ord:(L.ord&&typeof L.ord[t.id]==='number')?L.ord[t.id]:((typeof t.ord==='number')?t.ord:500),
+        note:t.note||'',core:!!t.core,optional:!!t.optional,
+        done:(L.done&&L.done[t.id])||0,skip:skip.indexOf(t.id)>=0,
+        with:(t.with||[]).slice(),rep:t.date?null:('r-'+t.id)});
+    });
+    return out;
+  };
+  var days=Object.keys(log).sort();
+  var t0=todayIso();
+  var from=days.length?(days[0]<monthStart(t0)?days[0]:monthStart(t0)):monthStart(t0);
+  var to=monthEnd(t0); if(days.length&&days[days.length-1]>to)to=days[days.length-1];
+  var items={},d=from;
+  while(d<=to){
+    var raw=oldDay(d);
+    if(raw.length){
+      var map={},arr=[];
+      raw.forEach(function(r){var it=I(r);map[r.src]=it.id;arr.push(it)});
+      arr.forEach(function(it,i){
+        it.with=(raw[i].with||[]).map(function(w){return map[w]}).filter(function(x){return x});
+      });
+      items[d]=arr;
     }
-    var min=(mode==='A'&&typeof t.minA==='number')?t.minA:t.min;
-    if(min<=0)continue;
-    var at=(mode==='A'&&t.atA)?t.atA:t.at;
-    var o={id:t.id,title:t.title,dir:t.dir,min:min,fix:!!t.fix,at:at||null,
-           ord:(typeof t.ord==='number')?t.ord:500,with:(t.with||[]).slice(),
-           core:t.core,note:t.note,optional:t.optional,ref:t};
-    var ov=L.ovr[t.id];
-    if(ov){
-      if(ov.min)o.min=ov.min;
-      if(ov.fixDay&&ov.at){o.fix=true;o.at=ov.at}
-      else if(ov.at&&o.fix)o.at=ov.at;
-    }
-    if(o.fix&&!o.at)o.fix=false;
-    out.push(o);
+    d=addD(d,1);
   }
-  /* если пары пропущены — вместо них практика */
-  var skippedPair=out.some(function(o){return o.dir==='study'&&o.fix&&L.skip.indexOf(o.id)>=0});
-  var hasPract=out.some(function(o){return o.title.indexOf('Практика')===0});
-  if(skippedPair&&!hasPract&&L.skip.indexOf('v-pract')<0)
-  {
-    var pr=out.filter(function(o){return o.dir==='study'&&L.skip.indexOf(o.id)>=0})[0];
-    var pv={id:'v-pract',title:'Практика по дистанту вместо пар',dir:'study',min:90,fix:false,at:null,
-            ord:(pr&&pr.at?t2m(pr.at):480),with:[],note:'Пары пропущены, задачи всё равно нужны',virt:true};
-    var ovp=L.ovr['v-pract'];
-    if(ovp){ if(ovp.min)pv.min=ovp.min; if(ovp.fixDay&&ovp.at){pv.fix=true;pv.at=ovp.at} }
-    out.push(pv);
-  }
-  return out;
+  var nlog={};
+  for(var k in log)if(log[k]&&log[k].shield)nlog[k]={shield:true};
+  S={ v:7,
+      settings:{wake:(old.settings&&old.settings.wake)||'06:00',sleep:(old.settings&&old.settings.sleep)||'23:00',
+                theme:(old.settings&&old.settings.theme)||'dark',goal:(old.settings&&old.settings.goal)||60000},
+      cats:JSON.parse(JSON.stringify(BASECATS)),
+      items:items, log:nlog,
+      clients:old.clients||[], reels:old.reels||[], income:old.income||[], shield:old.shield||{},
+      ui:{view:((old.ui&&old.ui.view)==='tasks')?'day':((old.ui&&old.ui.view)||'day'),
+          date:(old.ui&&old.ui.date)||todayIso(),week:(old.ui&&old.ui.week)||monday(todayIso()),timer:null} };
+  save();
+})();
+if(!S.cats||!S.cats.length)S.cats=JSON.parse(JSON.stringify(BASECATS));
+if(!S.items)S.items={};
+if(!S.log)S.log={};
+if(S.settings){delete S.settings.mode;delete S.settings.norms;delete S.settings.parity}
+if(S.ui&&S.ui.view==='tasks')S.ui.view='day';
+
+function logOf(d){ if(!S.log)S.log={}; if(!S.log[d])S.log[d]={}; return S.log[d] }
+function instances(d){
+  return dayList(d).map(function(t){
+    return {id:t.id,title:t.title,dir:t.dir,min:(+t.min||0),fix:!!t.at,at:t.at||null,
+            ord:(typeof t.ord==='number')?t.ord:500,with:(t.with||[]).slice(),
+            core:!!t.core,note:t.note||'',optional:!!t.optional,rep:t.rep||null,ref:t};
+  });
 }
 
 /* ======== расчёт дня ========
    Порядок задаёт человек, время считается само.
    Дела с меткой времени стоят на своём часе; остальные идут подряд и обходят метки. */
-function spanMin(at,to){
-  if(!at||!to)return 0;
-  var a=t2m(at),m=t2m(to)-a;
-  if(m<=0){ if(a>=20*60&&m+1440<=5*60)m+=1440; else return 0; }
-  return Math.min(1435,m);
-}
-function endT(at,min){return m2t((t2m(at)+(+min||0))%1440)}
-/* место задачи в порядке дня: разовая перестановка этого дня важнее общей */
-function ordKey(L,o){
-  if(L&&L.ord&&typeof L.ord[o.id]==='number')return L.ord[o.id];
-  return (typeof o.ord==='number')?o.ord:500;
-}
+function ordKey(o){return (typeof o.ord==='number')?o.ord:500}
 /* дела, идущие одновременно, собираются в один блок */
 function dayGroups(d){
   var L=logOf(d),items=instances(d);
   items.forEach(function(o){
-    o.skipped=L.skip.indexOf(o.id)>=0;
-    o.doneMin=L.done[o.id]||0;
-    o.done=!o.skipped&&o.doneMin>=o.min-1;
-    o.key=ordKey(L,o);
+    o.skipped=!!o.ref.skip;
+    o.doneMin=(+o.ref.done||0);
+    o.done=!o.skipped&&o.min>0&&o.doneMin>=o.min-1;
+    o.key=ordKey(o);
     o.s=dayStart();o.e=dayStart();
   });
   var act=items.filter(function(x){return !x.skipped}),byId={},adj={},k;
@@ -791,8 +744,8 @@ function planDay(d){
 
 /* ---- оценка дня, серия, уровни ---- */
 function dayCounted(d){
-  var L=S.log[d]; if(!L)return false;
-  if(L.shield)return null;
+  if(!dayList(d).length)return false;
+  if(S.log[d]&&S.log[d].shield)return null;
   var p=planDay(d);
   if(!p.planned)return null;
   return p.ratio>=.7;
@@ -811,24 +764,31 @@ function streak(){
 }
 function totalMin(from,to){
   var s=0;
-  for(var d in S.log){
+  for(var d in S.items){
     if(from&&d<from)continue; if(to&&d>to)continue;
-    var o=S.log[d].done||{};
-    for(var k in o)s+=o[k];
+    dayList(d).forEach(function(t){s+=Math.min(+t.done||0,Math.max(+t.min||0,+t.done||0))});
   }
   return s;
 }
 function minByDir(from,to){
   var r={};
-  for(var d in S.log){
+  for(var d in S.items){
     if(from&&d<from)continue; if(to&&d>to)continue;
-    var mp={}; instances(d).forEach(function(o){mp[o.id]=o.dir});
-    var o=S.log[d].done||{};
-    for(var k in o){var dir=mp[k]||findDir(k);if(!dir)continue;r[dir]=(r[dir]||0)+o[k]}
+    dayList(d).forEach(function(t){
+      var v=+t.done||0; if(!v)return;
+      r[t.dir]=(r[t.dir]||0)+v;
+    });
   }
   return r;
 }
-function findDir(id){var t=S.tasks.filter(function(x){return x.id===id})[0];return t?t.dir:(id==='v-pract'?'study':null)}
+function plannedByDir(from,to){
+  var r={};
+  for(var d in S.items){
+    if(from&&d<from)continue; if(to&&d>to)continue;
+    dayList(d).forEach(function(t){ if(t.skip)return; r[t.dir]=(r[t.dir]||0)+(+t.min||0) });
+  }
+  return r;
+}
 var RANKS=[[0,'Старт'],[25,'Разгон'],[75,'Поток'],[150,'Темп'],[300,'Ход'],[600,'Мастерская'],[1000,'Своя лига']];
 function rank(){
   var h=totalMin()/60,cur=RANKS[0],next=null;
@@ -866,7 +826,6 @@ var IC={
 var TABS=[
   ['day','День','<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.2 4.2l1.7 1.7M18.1 18.1l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.2 19.8l1.7-1.7M18.1 5.9l1.7-1.7"/></svg>'],
   ['week','Неделя','<svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.8v3.4M16 2.8v3.4"/></svg>'],
-  ['tasks','Задачи','<svg viewBox="0 0 24 24"><path d="M9 6h12M9 12h12M9 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>'],
   ['flow','Поток','<svg viewBox="0 0 24 24"><path d="M4 7h9M4 7l3-3M4 7l3 3M20 17h-9M20 17l-3-3M20 17l-3 3"/></svg>'],
   ['stat','Прогресс','<svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-6M22 19H2"/></svg>']
 ];
@@ -874,8 +833,9 @@ function renderTabs(){
   document.getElementById('tabs').innerHTML=TABS.map(function(t){
     return '<button class="tab'+(S.ui.view===t[0]?' on':'')+'" data-act="go" data-v="'+t[0]+'">'+t[2]+'<span>'+t[1]+'</span></button>';
   }).join('');
-  var mc=document.getElementById('modeChip');
-  mc.innerHTML=S.settings.mode==='B'?'<b>Полный день</b>':'<b>С работой</b>';
+  var mc=document.getElementById('modeChip'),ah=plannedAhead();
+  mc.innerHTML='План на <b>'+(ah>=60?'60+ дн':(ah+' '+(ah%10===1&&ah%100!==11?'день':(ah%10>=2&&ah%10<=4&&(ah%100<10||ah%100>=20)?'дня':'дней'))))+'</b>';
+  mc.className='chip'+(ah<=2?' warn':'');
 }
 var UNDO=null;
 function hideToast(){
@@ -907,7 +867,7 @@ function viewDay(){
      '<button class="btn sm ghost" data-act="dtoday">Сегодня</button>'+
      '<button class="iconbtn" data-act="dday" data-v="1">'+IC.right+'</button></div></div>';
   h+='<div class="chips">'+
-     '<button class="chip'+(wday(d)===6||wday(d)===1?' acc':'')+'" data-act="parity">Неделя <b>'+(isOdd(d)?'нечётная':'чётная')+'</b></button>'+
+     '<button class="chip" data-act="addDay2">'+IC.plus+' Дело</button>'+
      '<button class="chip'+(L.shield?' acc':'')+'" data-act="shield">Щит <b>'+(L.shield?'стоит':shieldsLeft()+' из 2')+'</b></button>'+
      (p.clash.length?'<button class="chip warn" data-act="clashWhy">Метки спорят: <b>'+p.clash.length+'</b></button>':'')+
      (p.late?'<span class="chip warn">После отбоя: <b>'+p.late+'</b></span>':'')+
@@ -915,23 +875,30 @@ function viewDay(){
   /* сводка */
   h+='<div class="card"><div class="statrow">'+ring(p.ratio)+
      '<div style="flex:1;min-width:0"><div style="font-size:15px">Сделано '+hm(p.done)+' из '+hm(p.planned)+'</div>'+
-     '<div class="dim" style="font-size:12.5px;margin-top:3px">Свободно '+hm(p.freeMin)+' · день закрывается в '+m2t(p.endAt)+'</div>'+
-     '<div class="load">'+DKEYS.map(function(k){
+     '<button class="why" data-act="freeWhy">'+
+       (p.planned?('Свободно '+hm(p.freeMin)+' из '+hm(dayEnd()-dayStart())+' · день закрывается в '+m2t(p.endAt)):
+                  ('День пустой: свободно всё окно, '+hm(dayEnd()-dayStart())))+' <i>?</i></button>'+
+     '<div class="load">'+catKeys().map(function(k){
         var v=p.byDir[k]||0;if(!v)return '';
-        return '<i style="flex:'+v+';background:'+DIRS[k].c+'"></i>';
+        return '<i style="flex:'+v+';background:'+catColor(k)+'"></i>';
      }).join('')+'</div>'+
-     '<div class="legend">'+DKEYS.filter(function(k){return p.byDir[k]}).map(function(k){
-        return '<span><i style="background:'+DIRS[k].c+'"></i>'+DIRS[k].t+' '+hmS(p.byDir[k])+'</span>';
+     '<div class="legend">'+catKeys().filter(function(k){return p.byDir[k]}).map(function(k){
+        return '<span><i style="background:'+catColor(k)+'"></i>'+catName(k)+' '+hmS(p.byDir[k])+'</span>';
      }).join('')+'</div></div></div></div>';
   /* лента дня */
   h+='<div class="sect"><div class="lab">План дня</div><div class="line"></div>'+
-     '<button class="btn sm" data-act="pickDay">'+IC.plus+' Задача</button></div>';
-  h+='<div class="dim" style="font-size:11.5px;margin:-4px 0 9px;line-height:1.5">'+
-     'День идёт списком сверху вниз. Потяните блок за точки справа и отпустите на другом деле, чтобы встать на его место. '+
-     'Дела с меткой времени стоят на своём часе, остальные обходят их.</div>';
+     '<button class="btn sm" data-act="addDay2">'+IC.plus+' Дело</button></div>';
+  if(p.items.filter(function(o){return !o.skipped}).length)
+    h+='<div class="dim" style="font-size:11.5px;margin:-4px 0 9px;line-height:1.5">'+
+       'Нажмите на дело, чтобы изменить его: правка касается только '+dateShort(d)+'. '+
+       'Потяните за точки справа, чтобы переставить. Дела с меткой времени стоят на своём часе, остальные идут подряд и обходят их.</div>';
   h+='<div class="card pad0" style="padding:6px 13px"><div class="tl">';
   var shown=p.items.filter(function(o){return !o.skipped});
-  if(!shown.length)h+='<div class="dim" style="padding:22px 4px;text-align:center">На этот день ничего не запланировано</div>';
+  if(!shown.length){
+    var src=lastSameWeekday(d);
+    h+='<div class="dim" style="padding:20px 4px;text-align:center;line-height:1.6">На этот день ничего не запланировано'+
+       (src?'<br><button class="btn sm" style="margin-top:10px" data-act="fillDay" data-v="'+src+'">Взять, как было в '+dateShort(src)+'</button>':'')+'</div>';
+  }
   var nowM=(new Date()).getHours()*60+(new Date()).getMinutes(),nowShown=false;
   shown.forEach(function(o,idx){
     if(isT&&!nowShown&&o.s>nowM){h+='<div class="nowline"><b>сейчас '+m2t(nowM)+'</b><i></i></div>';nowShown=true}
@@ -939,17 +906,17 @@ function viewDay(){
     var nx=shown[idx+1];
     if(nx&&!nx.parallel&&o.gEnd!=null&&nx.s-o.gEnd>=15){
       var g=nx.s-o.gEnd;
-      h+='<div class="brk"><span>свободно '+hm(g)+'</span><div class="l"></div></div>';
+      h+='<div class="brk"><span>свободно '+hm(g)+' до '+m2t(nx.s)+', дальше «'+esc(shortName(nx.title,14))+'»</span><div class="l"></div></div>';
     }
   });
   h+='</div></div>';
   /* хвосты вчера */
-  var y=addD(d,-1),yl=S.log[y],yused=!!(yl&&((yl.done&&Object.keys(yl.done).length)||(yl.skip&&yl.skip.length)));
+  var y=addD(d,-1),yused=dayList(y).some(function(t){return (+t.done||0)>0||t.skip});
   var yp=yused?planDay(y):null;
   var tails=yused?yp.items.filter(function(o){return !o.done&&!o.skipped&&!o.optional}).slice(0,4):[];
   if(d===todayIso()&&tails.length){
     h+='<div class="sect"><div class="lab">Хвосты со вчера</div><div class="line"></div></div><div class="card">'+
-      tails.map(function(o){return '<div class="trow"><div class="bar" style="background:'+DIRS[o.dir].c+';width:2px;height:26px;border-radius:2px"></div>'+
+      tails.map(function(o){return '<div class="trow"><div class="bar" style="background:'+catColor(o.dir)+';width:2px;height:26px;border-radius:2px"></div>'+
       '<div class="mid"><div class="nm">'+esc(o.title)+'</div><div class="mt">'+hm(o.min-o.doneMin)+' осталось</div></div>'+
       '<button class="btn sm" data-act="pull" data-id="'+o.id+'" data-v="'+y+'">Взять сегодня</button></div>'}).join('')+'</div>';
   }
@@ -979,19 +946,20 @@ function itemHTML(o,d){
     :(o.fixG?'<div class="time at">'+m2t(o.s)+'<s>'+m2t(o.e%1440)+'</s></div>'
             :'<div class="time"><span class="no">'+(o.num||'')+'</span></div>');
   return '<div class="item'+(o.done?' done':'')+(o.skipped?' done':'')+'"'+
-    ' data-row="'+o.id+'" data-mv="'+(mv?1:0)+'" style="--c:'+DIRS[o.dir].c+'">'+
+    ' data-row="'+o.id+'" data-mv="'+(mv?1:0)+'" style="--c:'+catColor(o.dir)+'">'+
     tcol+'<div class="bar"></div>'+
     '<div class="mid"><div class="ttl">'+
       '<button class="chk" data-act="toggle" data-id="'+o.id+'">'+IC.check+'</button>'+
-      '<span>'+esc(o.title)+'</span>'+
+      '<span data-act="edit" data-id="'+o.id+'">'+esc(o.title)+'</span>'+
       (o.parallel?'<span class="tag acc">'+(o.hostTitle?'вместе с: '+esc(shortName(o.hostTitle,18).toLowerCase()):'одновременно')+'</span>':'')+
       (o.withT&&o.withT.length?'<span class="tag acc">вместе: '+esc(o.withT.map(function(x){return shortName(x,14).toLowerCase()}).join(', '))+'</span>':'')+
       (o.optional?'<span class="tag">можно не идти</span>':'')+
+      (o.rep?'':'<span class="tag">только сегодня</span>')+
       (o.skipped?'<span class="tag warn">пропущено</span>':'')+
       (o.clash?'<span class="tag warn">метка спорит с другой</span>':'')+
       (o.late?'<span class="tag warn">после отбоя</span>':'')+
     '</div>'+
-    '<div class="meta">'+DIRS[o.dir].t+' · '+hm(o.min)+
+    '<div class="meta" data-act="edit" data-id="'+o.id+'">'+catName(o.dir)+' · '+hm(o.min)+
       (part?' · сделано '+hm(o.doneMin):'')+(run?'<span id="runclock"> · идёт</span>':'')+'</div>'+
     (o.note?'<div class="note">'+esc(o.note)+'</div>':'')+
     (part?'<div class="pbar"><i style="width:'+Math.min(100,o.doneMin/o.min*100)+'%"></i></div>':'')+
@@ -1009,7 +977,7 @@ function viewWeek(){
   var days=[];
   for(i=0;i<7;i++){var d=addD(w,i),p=planDay(d);days.push({d:d,p:p});tot+=p.planned;doneT+=p.done;
     for(var k in p.byDir)byDir[k]=(byDir[k]||0)+p.byDir[k];}
-  h+='<div class="dayhead"><div><div class="lab">Неделя '+(isOdd(w)?'нечётная':'чётная')+'</div>'+
+  h+='<div class="dayhead"><div><div class="lab">Неделя</div>'+
      '<h1 class="h1" style="margin-top:2px">'+dateShort(w)+' <em>—</em> '+dateShort(addD(w,6))+'</h1></div><div class="top-sp"></div>'+
      '<div class="datenav"><button class="iconbtn" data-act="dweek" data-v="-1">'+IC.left+'</button>'+
      '<button class="btn sm ghost" data-act="wtoday">Текущая</button>'+
@@ -1017,7 +985,7 @@ function viewWeek(){
   h+='<div class="card"><div class="statrow">'+ring(tot?doneT/tot:0)+
      '<div style="flex:1"><div style="font-size:15px">'+hmS(doneT)+' из '+hmS(tot)+' за неделю</div>'+
      '<div class="dim" style="font-size:12.5px;margin-top:3px">В среднем '+hmS(tot/7)+' в день</div>'+
-     '<div class="load" style="margin-bottom:0">'+DKEYS.map(function(k){var v=byDir[k]||0;return v?'<i style="flex:'+v+';background:'+DIRS[k].c+'"></i>':''}).join('')+'</div>'+
+     '<div class="load" style="margin-bottom:0">'+catKeys().map(function(k){var v=byDir[k]||0;return v?'<i style="flex:'+v+';background:'+catColor(k)+'"></i>':''}).join('')+'</div>'+
      '</div></div></div>';
   h+='<div class="card pad0" style="padding:4px 13px">';
   days.forEach(function(x){
@@ -1026,122 +994,28 @@ function viewWeek(){
     var L=S.log[x.d]||{};
     h+='<button class="wkday'+(x.d===todayIso()?' today':'')+'" data-act="openday" data-v="'+x.d+'">'+
       '<div class="d"><b>'+WDS[wday(x.d)-1]+'</b><s>'+prs(x.d).getDate()+' '+MONTH[prs(x.d).getMonth()].slice(0,3)+'</s></div>'+
-      '<div class="info"><div class="t">'+(anchors||'без меток времени')+'</div>'+
-        '<div class="dots">'+DKEYS.map(function(k){var v=x.p.byDir[k];return v?'<i style="--c:'+DIRS[k].c+';width:'+Math.max(8,Math.round(v/14))+'px"></i>':''}).join('')+'</div>'+
+      '<div class="info"><div class="t">'+(anchors||(dayList(x.d).length?'без меток времени':'день пуст'))+'</div>'+
+        '<div class="dots">'+catKeys().map(function(k){var v=x.p.byDir[k];return v?'<i style="--c:'+catColor(k)+';width:'+Math.max(8,Math.round(v/14))+'px"></i>':''}).join('')+'</div>'+
       '</div>'+
       '<div style="text-align:right"><div style="font-size:12.5px">'+hmS(x.p.planned)+'</div>'+
       '<div class="lab" style="letter-spacing:.1em">'+(L.shield?'щит':'')+'</div></div>'+
       ring(x.p.ratio,34,'')+'</button>';
   });
   h+='</div>';
-  /* недельные цели */
-  var norms=S.settings.norms[S.settings.mode],got=minByDir(w,addD(w,6));
-  h+='<div class="sect"><div class="lab">Цели недели</div><div class="line"></div>'+
-     '<button class="btn sm ghost" data-act="go" data-v="set">Изменить</button></div><div class="card"><div class="bars">';
-  Object.keys(norms).forEach(function(k){
-    var need=norms[k]*60,have=got[k]||0;
-    h+='<div class="bar2"><div class="n">'+DIRS[k].t+'</div><div class="t"><i style="--c:'+DIRS[k].c+';width:'+Math.min(100,have/need*100)+'%"></i></div>'+
-       '<div class="v">'+hmS(have)+' / '+norms[k]+' ч</div></div>';
+  /* сколько по категориям запланировано на неделю и сколько закрыто */
+  var want=plannedByDir(w,addD(w,6)),got=minByDir(w,addD(w,6));
+  h+='<div class="sect"><div class="lab">Неделя по категориям</div><div class="line"></div>'+
+     '<button class="btn sm ghost" data-act="extendAsk">Разложить дальше</button></div><div class="card"><div class="bars">';
+  catKeys().filter(function(k){return want[k]||got[k]}).forEach(function(k){
+    var need=want[k]||0,have=got[k]||0;
+    h+='<div class="bar2"><div class="n">'+catName(k)+'</div><div class="t"><i style="--c:'+catColor(k)+';width:'+(need?Math.min(100,have/need*100):0)+'%"></i></div>'+
+       '<div class="v">'+hmS(have)+' / '+hmS(need)+'</div></div>';
   });
   var reelsDone=S.reels.filter(function(r){return r.stage>=4}).length;
   h+='</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">'+
      '<span class="tag'+(reelsDone?' acc':'')+'" style="text-transform:none;font-size:11.5px;letter-spacing:.02em;padding:5px 9px">Роликов опубликовано: '+reelsDone+'</span>'+
      '<span class="tag" style="text-transform:none;font-size:11.5px;letter-spacing:.02em;padding:5px 9px">Клиентов в работе: '+S.clients.filter(function(c){return c.stage>0&&c.stage<4}).length+'</span>'+
      '</div></div><div style="height:26px"></div>';
-  V.innerHTML=h;
-}
-
-/* ---------------- ЗАДАЧИ ---------------- */
-function repText(t){
-  if(t.date)return 'один раз, '+dateShort(t.date);
-  var dd=(S.settings.mode==='A'&&t.daysA)?t.daysA:t.days;
-  if(!dd||!dd.length)return 'без дней';
-  if(dd.length===7)return 'каждый день'+(t.weeks==='odd'?', нечётные недели':(t.weeks==='even'?', чётные недели':''));
-  var s=dd.map(function(n){return WDS[n-1]}).join(' ');
-  if(t.weeks==='odd')s+=' · нечётные недели';
-  if(t.weeks==='even')s+=' · чётные недели';
-  return s;
-}
-/* «1 ч 30 мин» или «в 09:00 до 10:30» для режима, который открыт сейчас */
-function tSpan(t){
-  var mA=S.settings.mode==='A';
-  var at=(mA&&t.atA)?t.atA:(t.at||''), mn=(mA&&typeof t.minA==='number')?t.minA:t.min;
-  if(!mn)return 'в этом режиме нет';
-  if(!t.fix||!at)return hm(mn);
-  return 'в '+at+' до '+endT(at,mn);
-}
-function viewTasks(){
-  var tm=(S.ui.tmode==='ord')?'ord':'dir';
-  var mA=S.settings.mode==='A';
-  var h='<div class="dayhead"><div><div class="lab">Мои дела</div><h1 class="h1" style="margin-top:2px">Задачи</h1></div>'+
-    '<div class="top-sp"></div><button class="btn pri sm" data-act="newtask">'+IC.plus+' Новая</button></div>';
-  h+='<div class="seg" style="margin:12px 0 10px">'+
-     [['dir','По категориям'],['ord','Порядок дня']].map(function(x){
-       return '<button data-act="tmode" data-v="'+x[0]+'" class="'+(tm===x[0]?'on':'')+'">'+x[1]+'</button>'}).join('')+'</div>';
-  if(tm==='dir'){
-    h+='<div class="dim" style="font-size:12.5px;margin:2px 0 4px">Нажмите на задачу, чтобы открыть её целиком: категория, сколько времени, повторение, метка времени и соседи.</div>';
-    h+='<div style="display:flex;gap:7px;flex-wrap:wrap;margin:14px 0">'+
-       '<button class="btn sm" data-act="quick" data-v="drive">+ Вождение</button>'+
-       '<button class="btn sm" data-act="quick" data-v="once">+ Разовая задача</button>'+
-       '<button class="btn sm" data-act="quick" data-v="pair">+ Пара в ТИСБИ</button></div>';
-    DKEYS.forEach(function(k){
-      var list=S.tasks.filter(function(t){return t.dir===k});
-      if(!list.length)return;
-      list.sort(function(a,b){return ((a.fix?0:1)-(b.fix?0:1))||((a.ord||500)-(b.ord||500))});
-      var wk=list.filter(function(t){return t.active&&!t.date&&(!t.only||t.only===S.settings.mode)}).reduce(function(a,t){
-        var mn=(mA&&typeof t.minA==='number')?t.minA:t.min, dy=(mA&&t.daysA)?t.daysA:(t.days||[]);
-        return a+mn*dy.length;},0);
-      h+='<div class="sect"><span class="lab" style="color:'+DIRS[k].c+'">'+DIRS[k].t+'</span><div class="line"></div>'+
-         '<span class="lab">'+hmS(wk)+' / нед</span></div>';
-      h+='<div class="card pad0" style="padding:4px 14px">';
-      list.forEach(function(t){
-        var wn=withNames(t,12);
-        h+='<div class="trow'+(t.active?'':' off')+'">'+
-          '<div class="mid" data-act="edit" data-id="'+t.id+'"><div class="nm">'+esc(t.title)+
-            (t.fix?' <span class="tag acc" style="font-size:9px">'+((mA&&t.atA)?t.atA:t.at)+'</span>':'')+
-            (t.core?' <span class="tag acc" style="font-size:9px">минимум</span>':'')+
-            (t.only?' <span class="tag">режим '+t.only+'</span>':'')+'</div>'+
-          '<div class="mt">'+repText(t)+' · '+tSpan(t)+(wn?' · вместе: '+esc(wn):'')+'</div></div>'+
-          '<button class="sw'+(t.active?' on':'')+'" data-act="toggleTask" data-id="'+t.id+'"><i></i></button>'+
-          '<button class="mini" data-act="edit" data-id="'+t.id+'">'+IC.dots+'</button></div>';
-      });
-      h+='</div>';
-    });
-  }else{
-    var fixed=S.tasks.filter(function(t){return t.active&&t.fix&&!t.date})
-      .sort(function(a,b){return t2m((mA&&a.atA)?a.atA:(a.at||'12:00'))-t2m((mA&&b.atA)?b.atA:(b.at||'12:00'))});
-    var flow=ordTasks();
-    h+='<div class="dim" style="font-size:12.5px;margin:2px 0 10px;line-height:1.5">Этот порядок приложение берёт в каждом дне. '+
-       'Перестановка внутри дня его не меняет: она живёт только в том дне.</div>';
-    h+='<div class="sect"><div class="lab">С меткой времени</div><div class="line"></div></div>';
-    h+='<div class="card pad0" style="padding:4px 14px">';
-    if(!fixed.length)h+='<div class="dim" style="padding:14px 2px;font-size:13px">Пока ни у одной задачи нет метки времени.</div>';
-    fixed.forEach(function(t){
-      var at=(mA&&t.atA)?t.atA:t.at, mn=(mA&&typeof t.minA==='number')?t.minA:t.min;
-      h+='<div class="trow">'+
-        '<div class="time at" style="width:46px;flex:0 0 46px;font-size:13px">'+at+'</div>'+
-        '<div class="mid" data-act="edit" data-id="'+t.id+'"><div class="nm">'+esc(t.title)+'</div>'+
-        '<div class="mt">'+hm(mn)+' · '+repText(t)+'</div></div>'+
-        '<button class="mini" data-act="edit" data-id="'+t.id+'">'+IC.dots+'</button></div>';
-    });
-    h+='</div>';
-    h+='<div class="sect"><div class="lab">По порядку</div><div class="line"></div></div>';
-    h+='<div class="card pad0" style="padding:6px 13px"><div class="tl">';
-    if(!flow.length)h+='<div class="dim" style="padding:14px 2px;font-size:13px">Свободных задач нет.</div>';
-    flow.forEach(function(t,i){
-      var mn=(mA&&typeof t.minA==='number')?t.minA:t.min;
-      var wn=withNames(t,12);
-      h+='<div class="item" data-row="'+t.id+'" data-mv="1" data-scope="tasks" style="--c:'+DIRS[t.dir].c+'">'+
-        '<div class="time"><span class="no">'+(i+1)+'</span></div><div class="bar"></div>'+
-        '<div class="mid" data-act="edit" data-id="'+t.id+'"><div class="ttl"><span>'+esc(t.title)+'</span>'+
-          (wn?'<span class="tag acc">вместе: '+esc(wn)+'</span>':'')+'</div>'+
-        '<div class="meta">'+DIRS[t.dir].t+' · '+(mn?hm(mn):'в этом режиме нет')+' · '+repText(t)+'</div></div>'+
-        '<div class="acts"><button class="grip" data-act="grab" data-id="'+t.id+'" title="Потяните, чтобы изменить порядок">'+IC.grip+'</button>'+
-        '<button class="mini" data-act="edit" data-id="'+t.id+'">'+IC.dots+'</button></div></div>';
-    });
-    h+='</div></div>';
-  }
-  h+='<div style="height:26px"></div>';
   V.innerHTML=h;
 }
 
@@ -1227,14 +1101,13 @@ function viewFlow(){
 /* сводка по всей истории, одним проходом */
 function achStats(){
   var r={days:0,big:0,huge:0,full:0,gym:0,drive:0,early:0,best:0,streakBest:(S.streak&&S.streak.best)||0,dir:{}};
-  var ttl={};S.tasks.forEach(function(t){ttl[t.id]=t.title||''});
-  for(var d in S.log){
-    var done=S.log[d].done||{},sum=0,byd={},k,dir;
-    for(k in done){
-      sum+=done[k];dir=findDir(k);
-      if(dir)byd[dir]=(byd[dir]||0)+done[k];
-      if((ttl[k]||'').indexOf('Вождение')===0&&done[k]>=60)r.drive++;
-    }
+  for(var d in S.items){
+    var sum=0,byd={},k;
+    dayList(d).forEach(function(t){
+      var v=+t.done||0; if(!v)return;
+      sum+=v; byd[t.dir]=(byd[t.dir]||0)+v;
+      if((t.title||'').indexOf('Вождение')===0&&v>=60)r.drive++;
+    });
     if(!sum)continue;
     r.days++;
     if(sum>=480)r.big++;
@@ -1334,13 +1207,14 @@ function viewStat(){
   /* по направлениям */
   var dayN=prs(t).getDate();
   h+='<div class="sect"><div class="lab">Часы за месяц</div><div class="line"></div></div><div class="card"><div class="bars">';
-  DKEYS.forEach(function(k){
+  catKeys().forEach(function(k){
     var v=mon[k]||0,tgt=planBy[k]||0;
     var w=tgt?Math.min(100,v/tgt*100):(v?100:0);
-    h+='<div class="bar2"><div class="n">'+DIRS[k].t+'</div><div class="t"><i style="--c:'+DIRS[k].c+';width:'+w+'%"></i></div>'+
+    if(!v&&!tgt)return;
+    h+='<div class="bar2"><div class="n">'+catName(k)+'</div><div class="t"><i style="--c:'+catColor(k)+';width:'+w+'%"></i></div>'+
        '<div class="v">'+hmS(v)+(tgt?'<s> из '+hmS(tgt)+'</s>':'')+'</div></div>';
   });
-  h+='</div><div class="dim" style="font-size:11.5px;margin-top:12px">Слева сделанное, справа то, что стояло в плане с 1 по '+dayN+' число. Выходные и дни с режимом «Выходной» в план не входят.</div></div>';
+  h+='</div><div class="dim" style="font-size:11.5px;margin-top:12px">Слева сделанное, справа то, что стояло в плане с 1 по '+dayN+' число.</div></div>';
   /* достижения */
   var BG=badges(),got=BG.filter(function(b){return b.g}).length;
   h+='<div class="sect"><div class="lab">Достижения</div><div class="line"></div><div class="dim" style="font-size:12px">'+got+' из '+BG.length+'</div></div>'+
@@ -1358,35 +1232,38 @@ function viewStat(){
 
 /* ---------------- НАСТРОЙКИ ---------------- */
 function viewSet(){
-  var s=S.settings,n=s.norms[s.mode];
+  var s=S.settings;
   var h='<div class="dayhead"><div><div class="lab">Под себя</div><h1 class="h1" style="margin-top:2px">Настройки</h1></div></div>';
-  h+='<div class="card"><div class="h2">Режим месяца</div><div class="seg">'+
-    '<button data-act="setmode" data-v="B" class="'+(s.mode==='B'?'on':'')+'">Полный день на себя</button>'+
-    '<button data-act="setmode" data-v="A" class="'+(s.mode==='A'?'on':'')+'">Если выйду в банк</button></div>'+
-    '<div class="dim" style="font-size:12px;margin-top:9px">В режиме «с банком» со вторника по пятницу встаёт смена 9:00 — 21:00, на эти дни остаются только утро и вечер, а основная работа переезжает на понедельник, субботу и воскресенье.</div></div>';
   h+='<div class="card"><div class="h2">День</div>'+
     '<div style="display:flex;gap:12px"><div class="f" style="flex:1"><label>Подъём</label><input type="time" data-set="wake" value="'+s.wake+'"></div>'+
     '<div class="f" style="flex:1"><label>Отбой</label><input type="time" data-set="sleep" value="'+s.sleep+'"></div></div>'+
-    '<div class="trow"><div class="mid"><div class="nm">Текущая неделя: '+(isOdd(todayIso())?'нечётная':'чётная')+'</div><div class="mt">Влияет на субботние пары: 8:00 или 9:30</div></div>'+
-    '<button class="btn sm" data-act="parity">Переключить</button></div>'+
     '<div class="trow" style="border-bottom:0"><div class="mid"><div class="nm">Тема</div><div class="mt">Тёмная или светлая</div></div>'+
     '<button class="btn sm" data-act="theme">'+(s.theme==='dark'?'Тёмная':'Светлая')+'</button></div></div>';
-  h+='<div class="card"><div class="h2">Недельные нормы, часов</div>';
-  Object.keys(n).forEach(function(k){
-    h+='<div class="trow"><div class="mid"><div class="nm">'+DIRS[k].t+'</div></div>'+
-      '<input type="number" inputmode="numeric" style="width:84px;text-align:center" data-norm="'+k+'" value="'+n[k]+'"></div>';
+  var ah=plannedAhead();
+  h+='<div class="card"><div class="h2">План вперёд</div>'+
+    '<div class="dim" style="font-size:12.5px;line-height:1.55;margin-bottom:12px">Дела живут в своих днях. Сейчас расписано '+
+      ah+' '+(ah%10===1&&ah%100!==11?'день':(ah%10>=2&&ah%10<=4&&(ah%100<10||ah%100>=20)?'дня':'дней'))+' подряд, считая с сегодня. '+
+      'Разложить дальше значит повторить каждый пустой день по тому, как прошёл такой же день недели.</div>'+
+    '<div class="row-btns"><button class="btn sm" data-act="extendAsk">Разложить дальше</button></div></div>';
+  h+='<div class="card"><div class="h2">Категории</div>'+
+    '<div class="dim" style="font-size:12.5px;margin-bottom:10px">Цвет полосы у дела и разбивка в сводках. Свои категории можно добавлять и переименовывать.</div>';
+  cats().forEach(function(c){
+    h+='<div class="trow"><div class="bar" style="background:'+c.color+';width:3px;height:24px;border-radius:2px;margin-right:4px"></div>'+
+      '<div class="mid"><div class="nm">'+esc(c.name)+'</div><div class="mt">'+hmS(plannedByDir(monthStart(todayIso()),monthEnd(todayIso()))[c.id]||0)+' в этом месяце</div></div>'+
+      '<button class="mini" data-act="editcat" data-id="'+c.id+'">'+IC.dots+'</button></div>';
   });
-  h+='<div class="f" style="margin-top:14px"><label>Цель по деньгам в месяц, ₽</label><input type="number" inputmode="numeric" data-set="goal" value="'+(s.goal||0)+'"></div></div>';
+  h+='<div class="row-btns" style="margin-top:12px"><button class="btn sm" data-act="editcat" data-id="">'+IC.plus+' Новая категория</button></div></div>';
+  h+='<div class="card"><div class="h2">Деньги</div>'+
+    '<div class="f" style="margin-bottom:0"><label>Цель в месяц, ₽</label><input type="number" inputmode="numeric" data-set="goal" value="'+(s.goal||0)+'"></div></div>';
   h+='<div class="card"><div class="h2">Данные</div>'+
     '<div class="dim" style="font-size:12.5px;margin-bottom:12px">Всё хранится в самом браузере, на сервер ничего не уходит. Чтобы перенести между телефоном и компьютером, выгрузите файл и загрузите его на другом устройстве.</div>'+
-    '<div class="row-btns" style="margin-bottom:12px"><button class="btn sm" data-act="rebuildAsk">Пересобрать расписание недели</button></div>'+
-    '<div class="dim" style="font-size:11.5px;margin:-6px 0 14px;line-height:1.55">Вернёт делам из схемы их время, длительность и дни, снимет переносы на сегодня и дальше. Отметки о сделанном, доходы и свои задачи останутся.</div>'+
+
     '<div class="row-btns"><button class="btn sm" data-act="export">Выгрузить файл</button>'+
     '<button class="btn sm" data-act="importBtn">Загрузить файл</button>'+
     '<button class="btn sm" data-act="copyData">Скопировать текстом</button>'+
     '<button class="btn sm danger" data-act="reset">Сбросить всё</button></div>'+
     '<input type="file" id="fileIn" accept="application/json,.json" style="display:none"></div>';
-  h+='<div class="dim" style="font-size:11.5px;text-align:center;margin:18px 0 30px">devnprt.planner · сборка 14, ноябрь 2026 · работает без интернета</div>';
+  h+='<div class="dim" style="font-size:11.5px;text-align:center;margin:18px 0 30px">devnprt.planner · сборка 15, ноябрь 2026 · работает без интернета</div>';
   V.innerHTML=h;
 }
 
@@ -1406,7 +1283,7 @@ function hintMin(p){
   if(!el||!out)return;
   var v=parseInt(el.value,10);
   if(isNaN(v)||v<0)v=0;
-  out.textContent=v?hm(v):(p==='f'?'ноль, дела нет в этом режиме':'не задано');
+  out.textContent=v?hm(v):'не задано';
   var e2=document.getElementById(p+'_endn');
   if(e2){var sl=document.getElementById(p+'_slide');e2.textContent=sl?(' до '+m2t((+sl.value+v)%1440)):''}
 }
@@ -1484,14 +1361,14 @@ function sheetMenu(id){
   var d=S.ui.date,p=planDay(d);
   var o=p.items.filter(function(x){return x.id===id})[0];
   if(!o)return;
-  var tk=byTask(id),once=!!(tk&&tk.date);
-  var mvb=!o.parallel&&!o.done&&!o.fixG;
-  var where=o.fixG?('метка времени, '+m2t(o.s)+' до '+m2t(o.e%1440))
-                  :(o.parallel?('идёт вместе с «'+esc(shortName(o.hostTitle,20))+'»')
-                              :((o.num||1)+'-е в дне, '+hm(o.min)));
+  var mvb=!o.parallel&&!o.done&&!o.fix;
+  var ahead=repAhead(d,id);
+  var where=o.fix?('метка времени, '+m2t(o.s)+' до '+m2t(o.e%1440))
+                 :(o.parallel?('идёт вместе с «'+esc(shortName(o.hostTitle,20))+'»')
+                             :((o.num||1)+'-е в дне, '+hm(o.min)));
   var h='<h3>'+esc(o.title)+'</h3>'+
     '<div class="dim" style="font-size:12px;margin:-9px 0 13px">'+where+' · '+
-      (o.virt?'подстановка вместо пар':(once?'разовая задача, только на '+dateShort(d):'повторяется по расписанию задачи'))+'</div>'+
+      (ahead?('стоит ещё в '+ahead+' '+(ahead%10===1&&ahead%100!==11?'дне':'днях')+' впереди'):'только в этом дне')+'</div>'+
     (o.clash?'<div class="dim" style="font-size:12px;margin:-6px 0 12px;line-height:1.5;color:var(--warn)">Две метки времени стоят на один час. Сдвиньте одну из них или снимите метку.</div>':'')+
     (o.late?'<div class="dim" style="font-size:12px;margin:-6px 0 12px;line-height:1.5;color:var(--warn)">При нынешнем порядке заканчивается после отбоя '+S.settings.sleep+'. Поднимите дело выше или укоротите.</div>':'')+
     (mvb?'<div class="movebar">'+
@@ -1501,72 +1378,91 @@ function sheetMenu(id){
     '<div class="menu">'+
     '<button data-act="toggle" data-id="'+id+'">'+(o.done?'Снять отметку':'Отметить сделанным')+'</button>'+
     '<button data-act="part" data-id="'+id+'">Записать часть времени</button>'+
-    (tk?'<button data-act="withAsk" data-id="'+id+'">Что идёт вместе с этим делом</button>':'')+
-    '<button data-act="tune" data-id="'+id+'">Поправить только на сегодня</button>'+
-    (o.virt?'':'<button data-act="pickFor" data-id="'+id+'">Заменить на другую задачу</button>')+
+    '<button data-act="edit" data-id="'+id+'">Изменить это дело</button>'+
+    '<button data-act="repAsk" data-id="'+id+'">Повторить в других днях</button>'+
+    '<button data-act="withAsk" data-id="'+id+'">Что идёт вместе с этим делом</button>'+
     '<button data-act="tomorrow" data-id="'+id+'">Перенести на завтра</button>'+
-    (once?'<button data-act="edit" data-id="'+id+'">Изменить эту задачу</button>'
-         :(o.virt?'':'<button data-act="edit" data-id="'+id+'">Открыть задачу целиком</button>'))+
-    '<button data-act="skip" data-id="'+id+'" style="color:var(--warn)">'+
-      (o.optional?'Не идти, взять вместо пар практику':(once?'Удалить из дня':'Убрать из дня'))+'</button>'+
+    (ahead?'<button data-act="stopRep" data-id="'+id+'" style="color:var(--warn)">Убрать из будущих дней ('+ahead+')</button>':'')+
+    '<button data-act="skip" data-id="'+id+'" style="color:var(--warn)">Удалить из этого дня</button>'+
     '</div>';
   openSheet(h);
 }
-function sheetTask(id){
-  var t=id?byTask(id):null;
-  var nw=!t;
-  t=t||T({title:'',dir:'sites',min:60,days:[1,2,3,4,5],ord:500});
-  var mA=S.settings.mode==='A';
-  var eMin=(mA&&typeof t.minA==='number')?t.minA:t.min;
-  var eAt=(mA&&t.atA)?t.atA:(t.at||'12:00');
-  var eDays=((mA&&t.daysA)?t.daysA:(t.days||[]));
-  var oMin=(mA?t.min:(typeof t.minA==='number'?t.minA:t.min));
-  var oDays=(mA?(t.days||[]):((t.daysA)?t.daysA:(t.days||[])));
-  var diff=(oMin!==eMin)||(oDays.join()!==eDays.join());
-  var eRep=t.date?'once':(eDays.length===7?'daily':'days');
+/* ===== карточка дела: всё правится здесь и только в этом дне ===== */
+function sheetItem(id){
+  var d=S.ui.date,t=id?findItem(d,id):null,nw=!t;
+  t=t||I({title:'',dir:(cats()[0]||{id:'sites'}).id,min:60,ord:960});
   var wsel=(t.with||[]).slice();
-  var cand=S.tasks.filter(function(x){return x.id!==t.id&&x.active&&!x.date});
-  cand.sort(function(a,b){return (wsel.indexOf(b.id)>=0?1:0)-(wsel.indexOf(a.id)>=0?1:0)||
-    (DKEYS.indexOf(a.dir)-DKEYS.indexOf(b.dir))||((a.title<b.title)?-1:1)});
-  var h='<h3>'+(nw?'Новая задача':'Задача')+'</h3>'+
+  var cand=dayList(d).filter(function(x){return x.id!==t.id});
+  cand.sort(function(a,b){return (wsel.indexOf(b.id)>=0?1:0)-(wsel.indexOf(a.id)>=0?1:0)||((a.ord||500)-(b.ord||500))});
+  var ahead=id?repAhead(d,id):0;
+  var h='<h3>'+(nw?('Дело на '+dateShort(d)):'Дело')+'</h3>'+
+   '<div class="dim" style="font-size:12px;margin:-9px 0 13px;line-height:1.5">'+
+     (nw?'Встанет в конец списка этого дня. Повторить его в других днях можно сразу после сохранения.'
+        :('Правка касается только '+dateShort(d)+'.'+(ahead?(' В других днях ('+ahead+') это дело останется прежним.'):'')))+'</div>'+
    '<div class="f"><label>Название</label><input type="text" id="f_title" value="'+esc(t.title)+'" placeholder="Например: Android, второй блок"></div>'+
-   '<div class="f"><label>Категория</label><div class="seg" id="f_dir">'+DKEYS.map(function(k){
-      return '<button data-pick="dir" data-v="'+k+'" class="'+(t.dir===k?'on':'')+'">'+DIRS[k].t+'</button>'}).join('')+'</div></div>'+
-   '<div class="dim" style="font-size:11.5px;margin:-6px 0 12px">Правите режим «'+(mA?'С работой':'Полный день')+'». '+
-     (diff?'В другом режиме: '+hm(oMin)+', '+(oDays.length?oDays.map(function(x){return WDS[x-1]}).join(' '):'нет дней'):'Во втором режиме сейчас так же')+'</div>'+
-   minField('f',eMin,[20,30,45,60,90,120,180,240])+
-   '<div class="dim" style="font-size:11.5px;margin:-8px 0 12px">Ноль значит, что в этом режиме дела нет.</div>'+
-   timeField('f',!!t.fix,eAt,'Нужно для встреч, пар и смен. Без метки дело просто идёт по порядку.')+
-   '<div class="f"><label>Повторение</label><div class="seg" id="f_rep">'+
-     [['daily','Каждый день'],['days','По дням недели'],['once','Один раз']].map(function(x){
-       return '<button data-pick="rep" data-v="'+x[0]+'" class="'+(eRep===x[0]?'on':'')+'">'+x[1]+'</button>'}).join('')+'</div></div>'+
-   '<div id="f_wdays"'+(eRep==='days'?'':' style="display:none"')+'>'+
-   '<div class="f"><label>Дни недели</label><div class="days" id="f_days">'+WDS.map(function(w,i){
-      return '<button data-pick="day" data-v="'+(i+1)+'" class="'+(eDays.indexOf(i+1)>=0?'on':'')+'">'+w+'</button>'}).join('')+'</div></div>'+
-   '<div class="f"><label>Какие недели</label><div class="seg" id="f_weeks">'+
-      [['all','Каждую'],['odd','Нечётные'],['even','Чётные']].map(function(x){
-      return '<button data-pick="weeks" data-v="'+x[0]+'" class="'+((t.weeks||'all')===x[0]?'on':'')+'">'+x[1]+'</button>'}).join('')+'</div></div></div>'+
-   '<div id="f_wonce"'+(eRep==='once'?'':' style="display:none"')+'>'+
-   '<div class="f"><label>Дата</label><input type="date" id="f_date" value="'+(t.date||'')+'"></div></div>'+
-   '<div class="f"><label>Идёт вместе с</label>'+
-     '<div class="dim" style="font-size:11.5px;margin:-2px 0 8px">Отмеченные дела идут одновременно с этим и накладкой не считаются. Можно отметить сколько угодно.</div>'+
-     (cand.length?'<div class="picklist" style="max-height:33vh">'+cand.map(function(x){
+   '<div class="f"><label>Категория</label><div class="seg wrap" id="f_dir">'+cats().map(function(c){
+      return '<button data-pick="dir" data-v="'+c.id+'" class="'+(t.dir===c.id?'on':'')+'"><i class="cdot" style="background:'+c.color+'"></i>'+esc(c.name)+'</button>'}).join('')+
+      '<button data-act="editcat" data-id="">+ Своя</button></div></div>'+
+   minField('f',t.min,[20,30,45,60,90,120,180,240])+
+   timeField('f',!!t.at,t.at||'12:00','Нужно для встреч, пар и смен. Без метки дело просто идёт по порядку.')+
+   '<div class="f" style="margin-top:14px"><label>Идёт вместе с</label>'+
+     '<div class="dim" style="font-size:11.5px;margin:-2px 0 8px">Отмеченные дела этого дня идут одновременно с этим и накладкой не считаются.</div>'+
+     (cand.length?'<div class="picklist" style="max-height:30vh">'+cand.map(function(x){
         var on=wsel.indexOf(x.id)>=0;
         return '<button type="button" class="pickrow'+(on?' on':'')+'" data-pick="with" data-v="'+x.id+'">'+
-          '<i style="background:'+DIRS[x.dir].c+'"></i>'+
-          '<span class="pn">'+esc(x.title)+'<i class="sub">'+repText(x)+' · '+tSpan(x)+'</i></span>'+
+          '<i style="background:'+catColor(x.dir)+'"></i>'+
+          '<span class="pn">'+esc(x.title)+'<i class="sub">'+(x.at?('метка '+x.at):'по порядку')+' · '+hm(x.min)+'</i></span>'+
           '<span class="pm">'+(on?'вместе':'добавить')+'</span></button>'}).join('')+'</div>'
-               :'<div class="dim" style="font-size:12.5px">Других задач пока нет.</div>')+'</div>'+
+               :'<div class="dim" style="font-size:12.5px">В этом дне других дел пока нет.</div>')+'</div>'+
    '<div class="f"><label>Заметка</label><input type="text" id="f_note" value="'+esc(t.note||'')+'" placeholder="Коротко, зачем этот блок"></div>'+
-   '<div class="trow"><div class="mid"><div class="nm">Входит в минимум дня</div><div class="mt">Такие блоки держат серию</div></div>'+
+   '<div class="trow"><div class="mid"><div class="nm">Входит в минимум дня</div><div class="mt">Такие дела держат серию</div></div>'+
    '<button class="sw'+(t.core?' on':'')+'" data-pick="core"><i></i></button></div>'+
-   '<div class="trow" style="border-bottom:0"><div class="mid"><div class="nm">Задача включена</div><div class="mt">Выключенная не попадает в дни</div></div>'+
-   '<button class="sw'+(t.active!==false?' on':'')+'" data-pick="tactive"><i></i></button></div>'+
-   '<div class="row-btns" style="margin-top:16px"><button class="btn pri" data-act="saveTask" data-id="'+(nw?'':t.id)+'">Сохранить</button>'+
-   (nw?'':'<button class="btn danger" data-act="delTask" data-id="'+t.id+'">'+(t.date?'Удалить':'Удалить совсем')+'</button>')+
+   '<div class="trow" style="border-bottom:0"><div class="mid"><div class="nm">Можно не идти</div><div class="mt">Пары дистанта и всё необязательное</div></div>'+
+   '<button class="sw'+(t.optional?' on':'')+'" data-pick="opt"><i></i></button></div>'+
+   (nw?'':'<div class="row-btns" style="margin-top:4px"><button class="btn sm" data-act="repAsk" data-id="'+t.id+'">Повторить в других днях</button></div>')+
+   '<div class="row-btns" style="margin-top:16px"><button class="btn pri" data-act="saveItem" data-id="'+(nw?'':t.id)+'">Сохранить</button>'+
+   (nw?'':'<button class="btn danger" data-act="delItem" data-id="'+t.id+'">Удалить</button>')+
    '<button class="btn ghost" data-act="closeSheet">Отмена</button></div>';
-  TMP={dir:t.dir,days:eDays.slice(),weeks:t.weeks||'all',core:!!t.core,tactive:(t.active!==false),
-       with:wsel,mA:mA,rep:eRep};
+  TMP={dir:t.dir,core:!!t.core,opt:!!t.optional,with:wsel};
+  openSheet(h);
+}
+/* ===== повтор и копии ===== */
+function sheetRepeat(id){
+  var d=S.ui.date,t=findItem(d,id);
+  if(!t)return;
+  var wd=wday(d),ahead=repAhead(d,id);
+  var until=monthEnd(d);
+  if(until<=d)until=monthEnd(addD(d,7));
+  TMP={days:[wd],until:until};
+  var h='<h3>Повторить «'+esc(shortName(t.title,22))+'»</h3>'+
+   '<div class="dim" style="font-size:12.5px;margin:-9px 0 13px;line-height:1.55">Копии встанут в выбранные дни такими же, как сегодня: та же длительность, та же метка времени, то же место в списке. '+
+   'Потом каждую копию можно править отдельно.</div>'+
+   '<div class="f"><label>В какие дни недели</label><div class="days" id="f_days">'+WDS.map(function(w,i){
+      return '<button data-pick="rday" data-v="'+(i+1)+'" class="'+((i+1)===wd?'on':'')+'">'+w+'</button>'}).join('')+'</div></div>'+
+   '<div class="f"><label>До какого числа</label><input type="date" id="f_until" value="'+until+'"></div>'+
+   '<div class="dim" style="font-size:11.5px;margin:-8px 0 14px">По умолчанию до конца месяца. Дальше можно будет продлить одной кнопкой.</div>'+
+   '<div class="row-btns" style="margin-bottom:10px">'+
+     '<button class="btn" data-act="copyTom" data-id="'+id+'">Только на завтра</button>'+
+     (ahead?'<button class="btn danger" data-act="stopRep" data-id="'+id+'">Убрать из будущих ('+ahead+')</button>':'')+'</div>'+
+   '<div class="row-btns"><button class="btn pri" data-act="repDo" data-id="'+id+'">Повторить</button>'+
+   '<button class="btn ghost" data-act="closeSheet">Отмена</button></div>';
+  openSheet(h);
+}
+/* ===== свои категории ===== */
+function sheetCat(id){
+  var c=id?cats().filter(function(x){return x.id===id})[0]:null,nw=!c;
+  c=c||{id:'',name:'',color:PALETTE[cats().length%PALETTE.length]};
+  var used=0;
+  for(var k in S.items)dayList(k).forEach(function(t){if(t.dir===c.id)used++});
+  TMP={color:c.color};
+  var h='<h3>'+(nw?'Новая категория':'Категория')+'</h3>'+
+   '<div class="f"><label>Название</label><input type="text" id="c_name2" value="'+esc(c.name)+'" placeholder="Например: Английский"></div>'+
+   '<div class="f"><label>Цвет</label><div class="days" id="c_colors">'+PALETTE.map(function(col){
+      return '<button data-pick="color" data-v="'+col+'" class="'+(col===c.color?'on':'')+'" style="background:'+col+';border-color:'+col+';color:#0B0B0C">●</button>'}).join('')+'</div></div>'+
+   (nw?'':'<div class="dim" style="font-size:11.5px;margin:-6px 0 14px">В делах эта категория сейчас стоит '+used+' раз. При удалении они перейдут в «Прочее».</div>')+
+   '<div class="row-btns" style="margin-top:12px"><button class="btn pri" data-act="saveCat" data-id="'+(nw?'':c.id)+'">Сохранить</button>'+
+   (nw||cats().length<2?'':'<button class="btn danger" data-act="delCat" data-id="'+c.id+'">Удалить</button>')+
+   '<button class="btn ghost" data-act="closeSheet">Отмена</button></div>';
   openSheet(h);
 }
 var TMP={};
@@ -1690,14 +1586,6 @@ document.addEventListener('pointermove',function(e){
     var id=DRG.id,onto=DRG.onto,moved=DRG.on,scope=DRG.scope;
     dragEnd();
     if(!moved||!onto||onto===id)return;      /* отпустили мимо или там же, где взяли */
-    if(scope==='tasks'){
-      var snpT2=JSON.stringify(S.tasks);
-      if(!moveInTasks(id,onto))return;
-      save(); render();
-      toast(shortName((byTask(id)||{}).title||'Дело')+' теперь раньше в общем порядке',
-        function(){S.tasks=JSON.parse(snpT2);save();render()});
-      return;
-    }
     var d=S.ui.date,snp=snapDay(d);
     var gsD=ordBlocks(d),fiD=findBlock(gsD,id),tiD=findBlock(gsD,onto);
     if(fiD<0||tiD<0)return;
@@ -1712,21 +1600,11 @@ document.addEventListener('click',function(e){
   if(el.dataset.pick){
     var p=el.dataset.pick;
     if(p==='dir'){TMP.dir=v;el.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.dataset.v===v)})}
-    if(p==='weeks'){TMP.weeks=v;el.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.dataset.v===v)})}
+    if(p==='color'){TMP.color=v;el.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.dataset.v===v)})}
     if(p==='stage'){TMP.stage=+v;el.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',+b.dataset.v===+v)})}
-    if(p==='day'){var n=+v,i=TMP.days.indexOf(n);if(i<0)TMP.days.push(n);else TMP.days.splice(i,1);el.classList.toggle('on')}
-    if(p==='rep'){
-      TMP.rep=v;el.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.dataset.v===v)});
-      var wd=document.getElementById('f_wdays'),wo=document.getElementById('f_wonce'),dt=document.getElementById('f_date');
-      if(wd)wd.style.display=(v==='days')?'':'none';
-      if(wo)wo.style.display=(v==='once')?'':'none';
-      if(v==='daily'){TMP.days=[1,2,3,4,5,6,7];if(dt)dt.value='';
-        document.querySelectorAll('#f_days button').forEach(function(b){b.classList.add('on')})}
-      if(v==='days'&&dt)dt.value='';
-      if(v==='once'&&dt&&!dt.value)dt.value=S.ui.date;
-    }
+    if(p==='rday'){TMP.days=TMP.days||[];var n=+v,i=TMP.days.indexOf(n);if(i<0)TMP.days.push(n);else TMP.days.splice(i,1);el.classList.toggle('on')}
     if(p==='core'){TMP.core=!TMP.core;el.classList.toggle('on')}
-    if(p==='tactive'){TMP.tactive=!TMP.tactive;el.classList.toggle('on')}
+    if(p==='opt'){TMP.opt=!TMP.opt;el.classList.toggle('on')}
     if(p==='fix'){
       var pf=el.dataset.p||'f',box=document.getElementById(pf+'_fixbox');
       el.classList.toggle('on');
@@ -1748,12 +1626,9 @@ document.addEventListener('click',function(e){
       if(pmEl)pmEl.textContent=el.classList.contains('on')?'вместе':'добавить';
     }
     if(p==='kind'){TMP.kind=v;el.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.dataset.v===v)})}
-    if(p==='qdone'){TMP.qdone=!TMP.qdone;el.classList.toggle('on')}
     if(p==='pmin'){
       var pi=document.getElementById('p_min');
       if(pi)pi.value=v;
-      else{var qa0=document.getElementById('q_at'),qt0=document.getElementById('q_to');
-        if(qa0&&qt0&&qa0.value){qt0.value=endT(qa0.value,+v);durHint()}}
       el.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.dataset.v===v)})}
     return;
   }
@@ -1764,10 +1639,24 @@ document.addEventListener('click',function(e){
       var pn=el.dataset.p||'f',sl=document.getElementById(pn+'_slide');
       if(sl){sl.value=((+sl.value+(+v))%1440+1440)%1440;hintTime(pn)}
       break; }
+    case 'freeWhy': {
+      var pf2=planDay(d),win2=dayEnd()-dayStart();
+      var lines=catKeys().filter(function(k){return pf2.byDir[k]}).map(function(k){
+        return '<div class="trow"><span class="nm">'+catName(k)+'</span><span class="mt">'+hm(pf2.byDir[k])+'</span></div>'}).join('');
+      openSheet('<h3>Откуда взялось «свободно '+hm(pf2.freeMin)+'»</h3>'+
+        '<div class="dim" style="font-size:13px;line-height:1.6;margin:-6px 0 12px">'+
+        'Окно дня это время от подъёма до отбоя: с '+S.settings.wake+' до '+m2t(dayEnd())+', всего '+hm(win2)+'. '+
+        'Дела этого дня занимают '+hm(pf2.planned)+'. Разница и есть свободное время: '+hm(win2)+' минус '+hm(pf2.planned)+' это '+hm(pf2.freeMin)+'. '+
+        'Совмещённые дела считаются один раз, по самому длинному из них. Подъём и отбой меняются в настройках.</div>'+
+        (lines?('<div class="card pad0" style="padding:4px 13px">'+lines+'</div>'):'')+
+        '<div class="row-btns" style="margin-top:14px"><button class="btn" data-act="go" data-v="set">Открыть настройки</button>'+
+        '<button class="btn ghost" data-act="closeSheet">Понятно</button></div>');
+      break; }
     case 'clashWhy': openSheet('<h3>Две метки времени спорят</h3>'+
       '<div class="dim" style="font-size:13px;line-height:1.55;margin:-6px 0 4px">В этом дне два дела с точным временем попадают на один час. '+
       'Дела без метки расходятся сами, а метки приложение не двигает: это ваши встречи и пары. '+
-      'Откройте любое из них, нажмите «Поправить только на сегодня» и сдвиньте час, либо снимите метку, чтобы дело встало в общий порядок.</div>'+
+      'Откройте любое из них и сдвиньте час ползунком (правка касается только этого дня) либо снимите метку, чтобы дело встало в общий порядок. '+
+      'Если дела идут одновременно и это нормально, свяжите их через «Идёт вместе с».</div>'+
       '<div class="row-btns" style="margin-top:16px"><button class="btn ghost" data-act="closeSheet">Понятно</button></div>'); break;
     case 'go': go(v); break;
     case 'closeSheet': closeSheet(); break;
@@ -1776,20 +1665,45 @@ document.addEventListener('click',function(e){
     case 'openday': S.ui.date=v; go('day'); break;
     case 'dweek': S.ui.week=addD(S.ui.week,+v*7); save(); render(true); break;
     case 'wtoday': S.ui.week=monday(todayIso()); save(); render(true); break;
-    case 'mode': S.settings.mode=S.settings.mode==='B'?'A':'B'; save(); render();
-      toast(S.settings.mode==='B'?'Режим: полный день на себя':'Режим: с работой в банке'); break;
-    case 'setmode': S.settings.mode=v; save(); render(); break;
-    case 'parity': S.settings.parity={serial:wserial(todayIso()),odd:!isOdd(todayIso())}; save(); render();
-      toast('Текущая неделя теперь '+(isOdd(todayIso())?'нечётная':'чётная')); break;
+    case 'aheadWhy': {
+      var ahW=plannedAhead();
+      openSheet('<h3>План разложен на '+ahW+' дн.</h3>'+
+        '<div class="dim" style="font-size:13px;line-height:1.6;margin:-6px 0 4px">Каждое дело живёт в своём дне, поэтому вперёд расписано ровно столько дней, сколько вы разложили. '+
+        'Кнопка ниже заполнит пустые дни так же, как прошёл такой же день недели перед ними.</div>'+
+        '<div class="row-btns" style="margin-top:16px"><button class="btn pri" data-act="extendAsk">Разложить дальше</button>'+
+        '<button class="btn ghost" data-act="closeSheet">Закрыть</button></div>');
+      break; }
+    case 'extendAsk': {
+      var lx=lastDay()||todayIso();
+      if(lx<todayIso())lx=todayIso();
+      var u1=addD(lx,14),u2=monthEnd(addD(lx,1));
+      if(u2<=lx)u2=monthEnd(addD(u2,1));
+      openSheet('<h3>Разложить дни дальше</h3>'+
+        '<div class="dim" style="font-size:13px;line-height:1.6;margin:-6px 0 12px">Сейчас план доходит до '+dateShort(lx)+'. '+
+        'Пустые дни заполнятся по образцу прошлого такого же дня недели: что стояло в прошлый вторник, встанет и в следующий. '+
+        'Дни, где уже что-то есть, не тронутся.</div>'+
+        '<div class="row-btns"><button class="btn pri" data-act="extendDo" data-v="'+u1+'">Ещё две недели</button>'+
+        '<button class="btn" data-act="extendDo" data-v="'+u2+'">До конца '+MONTH[prs(u2).getMonth()]+'</button>'+
+        '<button class="btn ghost" data-act="closeSheet">Отмена</button></div>');
+      break; }
+    case 'extendDo': {
+      var snpX=snapAll(),madeX=extendTo(v);
+      save(); closeSheet(); render();
+      toast(madeX?('Разложено дней: '+madeX):'Свободных дней впереди не нашлось',madeX?function(){restoreAll(snpX)}:null);
+      break; }
+    case 'fillDay': {
+      var snpF=snapDay(d),madeF=fillFrom(v,d);
+      save(); closeSheet(); render();
+      toast(madeF?('Перенёс '+madeF+' дел из '+dateShort(v)):'В том дне нечего брать',madeF?function(){restoreDay(d,snpF)}:null);
+      break; }
     case 'theme': S.settings.theme=S.settings.theme==='dark'?'light':'dark';
       document.documentElement.setAttribute('data-theme',S.settings.theme); save(); render(); break;
     case 'brkAdv': { S.ui.brkAdv=!S.ui.brkAdv; save(); render(); break; }
     case 'shield': L=logOf(d); L.shield=!L.shield; save(); closeSheet(); render(); toast(L.shield?'Щит поставлен, серия цела':'Щит снят'); break;
     case 'toggle': {
-      L=logOf(d);
-      var pl=planDay(d),o=pl.items.filter(function(x){return x.id===id})[0];
-      if(!o)break;
-      if(o.done)delete L.done[id]; else L.done[id]=o.min;
+      var pl=planDay(d),o=pl.items.filter(function(x){return x.id===id})[0],tg=findItem(d,id);
+      if(!o||!tg)break;
+      tg.done=o.done?0:o.min;
       save(); closeSheet(); render();
       if(!o.done){var r=planDay(d).ratio; if(r>=0.999)toast('День закрыт полностью');}
       break; }
@@ -1797,69 +1711,56 @@ document.addEventListener('click',function(e){
     case 'timer': {
       var t=S.ui.timer;
       if(t&&t.id===id&&t.date===d){
-        var mins=Math.min(480,Math.max(1,Math.round((Date.now()-t.t0)/60000)));
-        L=logOf(d); L.done[id]=(L.done[id]||0)+mins; S.ui.timer=null; save(); render(); toast('Записано '+hm(mins));
+        var mins=Math.min(480,Math.max(1,Math.round((Date.now()-t.t0)/60000))),ti=findItem(d,id);
+        if(ti)ti.done=(+ti.done||0)+mins;
+        S.ui.timer=null; save(); render(); toast('Записано '+hm(mins));
       }else{ S.ui.timer={id:id,date:d,t0:Date.now()}; save(); render(); toast('Таймер пошёл'); }
       break; }
     case 'part': sheetPart(id); break;
     case 'savePart': {
       var pm=parseInt(document.getElementById('p_min').value,10)||0;
       if(pm<=0){toast('Укажите минуты');break}
-      L=logOf(d); L.done[id]=Math.min(1440,(L.done[id]||0)+pm);
+      var pit=findItem(d,id); if(!pit)break;
+      pit.done=Math.min(1440,(+pit.done||0)+pm);
       save(); closeSheet(); render(); toast('Записано '+hm(pm)); break; }
-    case 'tune': sheetTune(id); break;
-    case 'saveTune': {
-      L=logOf(d);
-      var tmn=readMin('t');
-      if(tmn<=0){toast('Укажите, сколько времени');break}
-      var snpT=snapDay(d),tfix=readFix('t');
-      var tk2=byTask(id),wasFix=!!(tk2&&tk2.fix);
-      L.ovr[id]=L.ovr[id]||{};
-      L.ovr[id].min=tmn;
-      if(tfix){
-        L.ovr[id].at=readAt('t');
-        /* задача без метки: на один день ей метку даёт журнал */
-        if(!wasFix)L.ovr[id].fixDay=1;
-      }else{ delete L.ovr[id].at; delete L.ovr[id].fixDay; }
-      save(); closeSheet(); render();
-      toast(tfix?('Сегодня в '+L.ovr[id].at+', '+hm(tmn)):('Сегодня '+hm(tmn)+', без метки времени'),
-            function(){restoreDay(d,snpT)});
-      break; }
-    case 'resetTune': L=logOf(d); delete L.ovr[id]; save(); closeSheet(); render(); break;
     case 'skip': {
-      var snapS=snapDay(d),how=dropFromDay(id,d);
+      var snapS=snapDay(d),gone1=findItem(d,id);
+      if(!gone1)break;
+      delItem(d,id);
       save(); closeSheet(); render();
-      toast(how==='del'?'Разовая задача удалена':'Блок убран из дня',function(){restoreDay(d,snapS)});
+      toast('Убрал «'+shortName(gone1.title,16)+'» из дня',function(){restoreDay(d,snapS)});
       break; }
     case 'tomorrow': {
-      var pl2=planDay(d),o2=pl2.items.filter(function(x){return x.id===id})[0];
-      if(!o2)break;
-      var mTom=o2.min-(o2.doneMin||0),dTom=addD(d,1);
-      S.tasks.push(T({title:o2.title,dir:o2.dir,min:mTom,ord:(o2.ord||500),fix:false,days:[],date:dTom,note:'перенесено с '+dateShort(d)}));
-      L=logOf(d); if(L.skip.indexOf(id)<0)L.skip.push(id);
-      save(); closeSheet(); render(); toast('Перенесено на завтра'); break; }
-    case 'pull': {
-      var py=planDay(v),oy=py.items.filter(function(x){return x.id===id})[0];
-      if(!oy)break;
-      var mPul=oy.min-(oy.doneMin||0);
-      S.tasks.push(T({title:oy.title,dir:oy.dir,min:mPul,ord:(oy.ord||500),fix:false,days:[],date:d,note:'хвост с '+dateShort(v)}));
-      var Ly=logOf(v); if(Ly.skip.indexOf(id)<0)Ly.skip.push(id);
-      save(); render(); break; }
-    case 'pickDay': sheetPick(null); break;
-    case 'pickFor': closeSheet(); sheetPick(id); break;
-    case 'pickTask': {
-      var snapP=snapDay(d);
-      /* замена встаёт на место прежнего дела, новая задача уходит в конец списка */
-      var gsB=ordBlocks(d),bi=v?findBlock(gsB,v):-1;
-      var prevId=(bi>0)?gsB[bi-1].lead.id:null;
-      if(v)dropFromDay(v,d);
-      var res=putInDay(id,d);
-      var nid=LASTPUT||id;
-      if(bi>=0)putAfter(d,nid,prevId);
+      var oT=findItem(d,id); if(!oT)break;
+      var dTom=addD(d,1),snpTm=JSON.stringify({a:S.items[d]||null,b:S.items[dTom]||null});
+      var cT=cloneItem(oT,false);
+      cT.min=Math.max(5,(+oT.min||0)-(+oT.done||0));
+      cT.rep=null; cT.note=oT.note||'';
+      dayListW(dTom).push(cT);
+      delItem(d,id);
       save(); closeSheet(); render();
-      toast(v?placeMsg(d,nid):spanMsg(d,nid,res==='copy'?'Поставил ещё раз':'Поставил'),
-            function(){restoreDay(d,snapP)});
+      toast('Перенёс на завтра, '+hm(cT.min),function(){
+        var o=JSON.parse(snpTm);
+        if(o.a)S.items[d]=o.a; else delete S.items[d];
+        if(o.b)S.items[dTom]=o.b; else delete S.items[dTom];
+        save(); render();});
       break; }
+    case 'pull': {
+      var oy=findItem(v,id); if(!oy)break;
+      var snpPl=JSON.stringify({a:S.items[d]||null,b:S.items[v]||null});
+      var cy=cloneItem(oy,false);
+      cy.min=Math.max(5,(+oy.min||0)-(+oy.done||0));
+      cy.rep=null; cy.note='хвост с '+dateShort(v); cy.ord=970;
+      dayListW(d).push(cy);
+      oy.skip=true;
+      save(); render();
+      toast('Взял хвост со вчера, '+hm(cy.min),function(){
+        var o=JSON.parse(snpPl);
+        if(o.a)S.items[d]=o.a; else delete S.items[d];
+        if(o.b)S.items[v]=o.b; else delete S.items[v];
+        save(); render();});
+      break; }
+    case 'addDay2': closeSheet(); sheetItem(null); break;
     case 'grab': break;   /* перетаскивание ведёт отдельный слушатель ниже */
     case 'mvUp': case 'mvDn': {
       var snpM=snapDay(d);
@@ -1876,107 +1777,107 @@ document.addEventListener('click',function(e){
       break; }
     case 'withAsk': closeSheet(); sheetWith(id); break;
     case 'unpair': {
-      var up=byTask(id); if(!up)break;
-      var snpU=JSON.stringify(S.tasks);
-      (up.with||[]).slice().forEach(function(w){linkTasks(up,byTask(w),false)});
+      var up=findItem(d,id); if(!up)break;
+      var snpU=snapDay(d);
+      (up.with||[]).slice().forEach(function(w){linkItems(d,up,findItem(d,w),false)});
       save(); closeSheet(); render();
-      toast('Теперь идёт само по себе',function(){S.tasks=JSON.parse(snpU);save();render()}); break; }
+      toast('Теперь идёт само по себе',function(){restoreDay(d,snpU)}); break; }
     case 'withTog': {
-      var hostT=byTask(id),sub=byTask(v);
+      var hostT=findItem(d,id),sub=findItem(d,v);
       if(!hostT||!sub)break;
-      var snpW=JSON.stringify(S.tasks),wasOn=(hostT.with||[]).indexOf(v)>=0;
-      linkTasks(hostT,sub,!wasOn);
+      var snpW=snapDay(d),wasOn=(hostT.with||[]).indexOf(v)>=0,dropped=false;
+      if(!wasOn&&sub.at){sub.at=null;dropped=true}
+      linkItems(d,hostT,sub,!wasOn);
       save(); render();
       var keep=SH.querySelector('.cardx').scrollTop;
       sheetWith(id); SH.querySelector('.cardx').scrollTop=keep;
-      toast(wasOn?('Отцепил: '+shortName(sub.title)):(shortName(sub.title)+' идёт вместе с «'+shortName(hostT.title)+'»'),
-        function(){S.tasks=JSON.parse(snpW);save();render();sheetWith(id)});
+      var whenW=startOf(d,hostT.id);
+      toast(wasOn?('Отцепил: '+shortName(sub.title)):
+        (shortName(sub.title)+' идёт вместе с «'+shortName(hostT.title,12)+'»'+(whenW!=null?(', в '+m2t(whenW)):'')+(dropped?'. Свою метку снял':'')),
+        function(){restoreDay(d,snpW);sheetWith(id)});
       break; }
-    case 'rebuildAsk': openSheet('<h3>Пересобрать расписание недели</h3>'+
-      '<div class="dim" style="font-size:13px;line-height:1.55;margin:-6px 0 4px">Делам из схемы вернётся их время, длительность и дни недели. Переносы, сделанные на сегодня и дальше, снимутся. '+
-      'Отметки о сделанном, доходы, клиенты и ваши собственные задачи останутся на месте.</div>'+
-      '<div class="row-btns" style="margin-top:16px"><button class="btn pri" data-act="rebuildDo">Пересобрать</button>'+
-      '<button class="btn ghost" data-act="closeSheet">Отмена</button></div>'); break;
-    case 'rebuildDo': {
-      var snpB=JSON.stringify(S);
-      rebuildSchedule(); save(); closeSheet(); render();
-      toast('Расписание пересобрано',function(){S=JSON.parse(snpB);save();render()});
-      break; }
-    case 'addToday': closeSheet(); sheetDayTask(); break;
-    case 'addDay': {
-      var qt=document.getElementById('q_title').value.trim();
-      if(!qt){toast('Напишите, что за задача');break}
-      var qm=readMin('q');
-      if(qm<=0){toast('Укажите, сколько времени');break}
-      var qfix=readFix('q');
-      var qn=T({title:qt,dir:TMP.dir||'sites',min:qm,ord:960,fix:qfix,at:qfix?readAt('q'):null,days:[],date:d});
-      S.tasks.push(qn);
-      if(TMP.qdone){L=logOf(d);L.done[qn.id]=qm}
+    case 'edit': closeSheet(); sheetItem(id); break;
+    case 'saveItem': {
+      var sMin=readMin('f');
+      if(sMin<0){toast('Укажите, сколько времени');break}
+      var sTitle=document.getElementById('f_title').value.trim();
+      if(!sTitle){toast('Напишите, что за дело');break}
+      var snpI=snapDay(d),it=id?findItem(d,id):null,isNew=!it;
+      if(!it){ it=addItem(d,{ord:960}); }
+      it.title=sTitle;
+      it.dir=TMP.dir||(cats()[0]||{id:'sites'}).id;
+      it.min=sMin;
+      it.at=readFix('f')?readAt('f'):null;
+      it.note=document.getElementById('f_note').value.trim();
+      it.core=!!TMP.core;
+      it.optional=!!TMP.opt;
+      (TMP.with||[]).forEach(function(wid){var sb=findItem(d,wid);if(sb&&sb.at&&(it.at||startOf(d,it.id)!=null))sb.at=null});
+      setWith(d,it,(TMP.with||[]).slice());
       save(); closeSheet(); render();
-      toast(TMP.qdone?('Записал как сделанное, '+hm(qm)):(qfix?('Поставил в '+qn.at+', '+hm(qm)):('Поставил в конец дня, '+hm(qm)))); break; }
-    case 'tmode': S.ui.tmode=v; save(); render(true); break;
-    case 'newtask': sheetTask(null); break;
-    case 'edit': closeSheet(); sheetTask(id); break;
-    case 'toggleTask': {
-      var tt=S.tasks.filter(function(x){return x.id===id})[0]; if(tt){tt.active=!tt.active;save();render()} break; }
-    case 'saveTask': {
-      var vRep=TMP.rep||'days';
-      var vDays=(vRep==='daily')?[1,2,3,4,5,6,7]:((vRep==='once')?[]:TMP.days.slice().sort());
-      var vDate=(vRep==='once')?(document.getElementById('f_date').value||null):null;
-      if(vRep==='once'&&!vDate){toast('Поставьте дату');break}
-      if(vRep==='days'&&!vDays.length){toast('Отметьте дни недели');break}
-      var newMin=readMin('f');
-      if(newMin<0){toast('Укажите, сколько времени');break}
-      var nt=id?byTask(id):T({});
-      nt.title=document.getElementById('f_title').value.trim()||'Без названия';
-      nt.dir=TMP.dir||'sites';
-      if(TMP.mA&&typeof nt.minA==='number')nt.minA=newMin; else nt.min=newMin;
-      nt.fix=readFix('f');
-      if(nt.fix){ if(TMP.mA&&nt.atA)nt.atA=readAt('f'); else nt.at=readAt('f'); }
-      nt.date=vDate;
-      if(TMP.mA&&nt.daysA)nt.daysA=vDays.slice(); else nt.days=vDays.slice();
-      nt.weeks=TMP.weeks||'all';
-      nt.core=!!TMP.core;
-      nt.note=document.getElementById('f_note').value.trim();
-      nt.active=(TMP.tactive!==false);
-      if(!id)S.tasks.push(nt);
-      setWith(nt,(TMP.with||[]).slice());
-      save(); closeSheet(); render(); toast('Сохранено'); break; }
-    case 'delTask': {
-      var pre=S.tasks.filter(function(x){return x.id===id})[0];
-      if(!armed(el,(pre&&pre.date)?'Точно удалить?':'Удалить во всех днях?'))break;
-      var gone=pre;
-      S.tasks=S.tasks.filter(function(x){return x.id!==id}); save(); closeSheet(); render();
-      toast('Задача удалена',function(){if(gone){S.tasks.push(gone);save();render()}}); break; }
+      toast(isNew?spanMsg(d,it.id,'Поставил'):('Сохранил на '+dateShort(d)),function(){restoreDay(d,snpI)});
+      break; }
+    case 'delItem': {
+      var dIt=findItem(d,id); if(!dIt)break;
+      var ahD=repAhead(d,id);
+      if(!armed(el,ahD?('Удалить только из '+dateShort(d)+'?'):'Точно удалить?'))break;
+      var snpD=snapDay(d);
+      delItem(d,id);
+      save(); closeSheet(); render();
+      toast('Удалил «'+shortName(dIt.title,16)+'»',function(){restoreDay(d,snpD)});
+      break; }
+    case 'repAsk': closeSheet(); sheetRepeat(id); break;
+    case 'repDo': {
+      var wds=(TMP.days||[]).slice();
+      if(!wds.length){toast('Отметьте дни недели');break}
+      var untilEl=document.getElementById('f_until'),until=untilEl?untilEl.value:'';
+      if(!until){toast('Поставьте дату, до какого числа');break}
+      if(until<=d){toast('Дата должна быть позже этого дня');break}
+      var snpR=snapAll();
+      var made=copyItemTo(d,id,dateList(addD(d,1),until,wds),true);
+      save(); closeSheet(); render();
+      toast(made?('Поставил ещё в '+made+' '+(made%10===1&&made%100!==11?'день':(made%10>=2&&made%10<=4&&(made%100<10||made%100>=20)?'дня':'дней'))):'Подходящих дней не нашлось',
+            made?function(){restoreAll(snpR)}:null);
+      break; }
+    case 'copyTom': {
+      var snpC=snapAll(),mc=copyItemTo(d,id,[addD(d,1)],false);
+      save(); closeSheet(); render();
+      toast(mc?'Скопировал на завтра':'Не вышло скопировать',mc?function(){restoreAll(snpC)}:null);
+      break; }
+    case 'stopRep': {
+      var ahS=repAhead(d,id);
+      if(!ahS){toast('Впереди этого дела нет');break}
+      if(!armed(el,'Убрать из '+ahS+' дней?'))break;
+      var snpS2=snapAll(),gone2=stopRepeat(d,id);
+      save(); closeSheet(); render();
+      toast('Убрал из будущих дней: '+gone2,function(){restoreAll(snpS2)});
+      break; }
+    case 'editcat': closeSheet(); sheetCat(id||''); break;
+    case 'saveCat': {
+      var cn=document.getElementById('c_name2').value.trim();
+      if(!cn){toast('Напишите название');break}
+      var col=TMP.color||PALETTE[0];
+      if(id){
+        var cc=cats().filter(function(x){return x.id===id})[0];
+        if(cc){cc.name=cn;cc.color=col}
+      }else{
+        var nid='c'+uid();
+        cats().push({id:nid,name:cn,color:col});
+        var fdir=document.getElementById('f_dir');
+        if(fdir)TMP.dir=nid;
+      }
+      save(); closeSheet(); render(); toast('Категория сохранена'); break; }
+    case 'delCat': {
+      if(cats().length<2){toast('Нужна хотя бы одна категория');break}
+      if(!armed(el,'Перенести дела в «Прочее»?'))break;
+      var snpCt=JSON.stringify({c:S.cats,i:S.items});
+      var fall=cats().filter(function(x){return x.id!==id})[0].id;
+      for(var dk2 in S.items)S.items[dk2].forEach(function(t){if(t.dir===id)t.dir=fall});
+      S.cats=cats().filter(function(x){return x.id!==id});
+      save(); closeSheet(); render();
+      toast('Категория удалена',function(){var o=JSON.parse(snpCt);S.cats=o.c;S.items=o.i;save();render()});
+      break; }
     case 'undo': { if(UNDO){var uf=UNDO;UNDO=null;
       var te=document.getElementById('toast');te.classList.remove('on');te.classList.remove('act');uf();toast('Восстановлено')} break; }
-    case 'quick': {
-      var once=function(){
-        TMP.rep='once';TMP.days=[];
-        document.getElementById('f_date').value=S.ui.date;
-        var wd=document.getElementById('f_wdays'),wo=document.getElementById('f_wonce');
-        if(wd)wd.style.display='none'; if(wo)wo.style.display='';
-        document.querySelectorAll('#f_rep button').forEach(function(b){b.classList.toggle('on',b.dataset.v==='once')});
-        document.querySelectorAll('#f_days button').forEach(function(b){b.classList.remove('on')});
-      };
-      var setFix=function(hhmm){
-        var sw=document.querySelector('[data-pick="fix"][data-p="f"]'),bx=document.getElementById('f_fixbox'),sl=document.getElementById('f_slide');
-        if(sw)sw.classList.add('on'); if(bx)bx.style.display='';
-        if(sl)sl.value=t2m(hhmm);
-        hintTime('f');
-      };
-      var setMin=function(mn){var i=document.getElementById('f_min');if(i)i.value=mn;hintMin('f')};
-      var setDir=function(k){TMP.dir=k;document.querySelectorAll('#f_dir button').forEach(function(b){b.classList.toggle('on',b.dataset.v===k)})};
-      if(v==='drive')sheetTask(null),setTimeout(function(){
-        document.getElementById('f_title').value='Вождение';
-        setDir('pdd'); setMin(120); setFix('15:00'); once();
-      },0);
-      if(v==='once')sheetTask(null),setTimeout(once,0);
-      if(v==='pair')sheetTask(null),setTimeout(function(){
-        document.getElementById('f_title').value='ТИСБИ, пары';
-        setDir('study'); setMin(170); setFix('08:00');
-      },0);
-      break; }
     case 'newcard': sheetCard(v,null); break;
     case 'editcard': sheetCard(v,id); break;
     case 'newmoney': sheetMoney(null); break;
@@ -2045,31 +1946,13 @@ document.addEventListener('change',function(e){
     S.settings[k]=(k==='goal')?(parseInt(el.value,10)||0):el.value;
     save(); if(k!=='goal')render();
   }
-  if(el.dataset.norm){S.settings.norms[S.settings.mode][el.dataset.norm]=parseFloat(el.value)||0;save()}
   if(el.id==='fileIn'&&el.files&&el.files[0]){
     var fr=new FileReader();
-    fr.onload=function(){try{var o=JSON.parse(fr.result);if(!o.tasks)throw 0;S=o;save();render();toast('Данные загружены')}catch(err){toast('Файл не подходит')}};
+    fr.onload=function(){try{var o=JSON.parse(fr.result);if(!o.items&&!o.tasks)throw 0;S=o;save();location.reload()}catch(err){toast('Файл не подходит')}};
     fr.readAsText(el.files[0]);
   }
 });
-function sheetDayTask(){
-  var d=S.ui.date;
-  TMP={dir:'sites',qdone:false};
-  openSheet('<h3>Задача на '+dateShort(d)+'</h3>'+
-    '<div class="dim" style="font-size:12.5px;margin:-8px 0 14px">Встанет только в этот день, в конец списка. Потом её можно поднять выше.</div>'+
-    '<div class="f"><label>Что делаю</label><input type="text" id="q_title" placeholder="Например: смета для детейлинга"></div>'+
-    '<div class="f"><label>Категория</label><div class="seg" id="f_dir">'+DKEYS.map(function(k){
-       return '<button data-pick="dir" data-v="'+k+'" class="'+(k==='sites'?'on':'')+'">'+DIRS[k].t+'</button>'}).join('')+'</div></div>'+
-    minField('q',60,[20,30,45,60,90,120,180])+
-    timeField('q',false,'12:00','Для встречи или созвона в конкретный час')+
-    '<div class="trow" style="border-bottom:0"><div class="mid"><div class="nm">Уже сделано</div>'+
-    '<div class="mt">Сразу засчитаю это время в день</div></div>'+
-    '<button class="sw" data-pick="qdone"><i></i></button></div>'+
-    '<div class="row-btns"><button class="btn pri" data-act="addDay">Добавить</button>'+
-    '<button class="btn ghost" data-act="closeSheet">Отмена</button></div>');
-}
-/* снимок дня для кнопки «Вернуть» в подсказке */
-/* ===== работа со временем блоков ===== */
+/* ===== порядок дел внутри дня ===== */
 /* строки дня сверху вниз: всё, что можно двигать */
 function dayRows(d){
   return planDay(d).floats.slice().sort(function(a,b){return a.s-b.s}).map(function(g){return g.lead.id});
@@ -2079,8 +1962,7 @@ function ordBlocks(d){
   return planDay(d).floats.slice().sort(function(a,b){return a.s-b.s});
 }
 function writeOrd(d,gs){
-  var L=logOf(d); L.ord=L.ord||{};
-  gs.forEach(function(g,i){g.ids.forEach(function(id){L.ord[id]=(i+1)*10})});
+  gs.forEach(function(g,i){g.ids.forEach(function(id){var t=findItem(d,id);if(t)t.ord=(i+1)*10})});
 }
 function findBlock(gs,id){
   for(var i=0;i<gs.length;i++)if(gs[i].ids.indexOf(id)>=0)return i;
@@ -2119,15 +2001,6 @@ function edgeInDay(d,id,top){
   return true;
 }
 /* поставить дело сразу после другого, не трогая остальных */
-function putAfter(d,id,afterId){
-  var gs=ordBlocks(d),fi=findBlock(gs,id);
-  if(fi<0)return false;
-  var g=gs.splice(fi,1)[0];
-  var ti=afterId?findBlock(gs,afterId):-1;
-  gs.splice(ti<0?gs.length:ti+1,0,g);
-  writeOrd(d,gs);
-  return true;
-}
 /* место в списке дня: номер и сосед сверху */
 function placeMsg(d,id){
   var gs=ordBlocks(d),i=findBlock(gs,id);
@@ -2137,101 +2010,136 @@ function placeMsg(d,id){
   var prev=shortName((gs[i-1].lead||{}).title||'',14);
   return nm+' теперь '+(i+1)+'-м, после «'+prev+'»';
 }
-/* что сказать человеку после перестановки */
-function moveMsg(d,id,was){return placeMsg(d,id)}
 /* «Поставил в день, 1 ч» */
 function spanMsg(d,id,pre){
   var o=planDay(d).items.filter(function(x){return x.id===id})[0];
   if(!o)return pre;
-  return pre+(o.fixG?(' в '+m2t(o.s)):'')+', '+hm(o.min);
+  return pre+(o.fix?(' в '+o.at):'')+', '+hm(o.min);
 }
 function startOf(d,id){var o=planDay(d).items.filter(function(x){return x.id===id})[0];return o?o.s:null}
-function byTask(id){return S.tasks.filter(function(x){return x.id===id})[0]}
-/* общий порядок: так дела идут в любом дне, пока их не переставили внутри дня */
-function ordTasks(){
-  return S.tasks.filter(function(t){return t.active&&!t.fix&&!t.date})
-    .sort(function(a,b){return ((a.ord||500)-(b.ord||500))||((a.title<b.title)?-1:1)});
-}
-function moveInTasks(id,onto){
-  var ls=ordTasks(),fi=-1,ti=-1,i;
-  for(i=0;i<ls.length;i++){if(ls[i].id===id)fi=i;if(ls[i].id===onto)ti=i}
-  if(fi<0||ti<0||fi===ti)return false;
-  var t=ls.splice(fi,1)[0];
-  ls.splice(ti,0,t);
-  ls.forEach(function(x,i2){x.ord=110+i2*10});
-  return true;
-}
-/* связь «идём одновременно» всегда обоюдная */
-function linkTasks(a,b,on){
-  if(!a||!b||a===b)return;
+
+/* ===== связи «идут одновременно»: только внутри своего дня ===== */
+function linkItems(d,a,b,on){
+  if(typeof a==='string')a=findItem(d,a);
+  if(typeof b==='string')b=findItem(d,b);
+  if(!a||!b||a===b||a.id===b.id)return;
   a.with=a.with||[]; b.with=b.with||[];
   if(on){ if(a.with.indexOf(b.id)<0)a.with.push(b.id); if(b.with.indexOf(a.id)<0)b.with.push(a.id) }
   else{ a.with=a.with.filter(function(x){return x!==b.id}); b.with=b.with.filter(function(x){return x!==a.id}) }
 }
-function setWith(t,ids){
-  (t.with||[]).slice().forEach(function(w){if(ids.indexOf(w)<0)linkTasks(t,byTask(w),false)});
-  ids.forEach(function(w){linkTasks(t,byTask(w),true)});
+function setWith(d,t,ids){
+  if(typeof t==='string')t=findItem(d,t);
+  if(!t)return;
+  (t.with||[]).slice().forEach(function(w){if(ids.indexOf(w)<0)linkItems(d,t,findItem(d,w),false)});
+  ids.forEach(function(w){linkItems(d,t,findItem(d,w),true)});
 }
-function withNames(t,n){
-  return (t.with||[]).map(function(w){var o=byTask(w);return o?shortName(o.title,n||14).toLowerCase():''})
-                     .filter(function(x){return x}).join(', ');
-}
-function snapDay(d){return JSON.stringify({l:S.log[d]||null,t:S.tasks})}
+/* ===== снимки для кнопки «Вернуть» ===== */
+function snapDay(d){return JSON.stringify({a:S.items[d]||null,l:(S.log[d]&&S.log[d].shield)?{shield:true}:null})}
 function restoreDay(d,snap){
   var o=JSON.parse(snap);
-  S.tasks=o.t; if(o.l)S.log[d]=o.l; else delete S.log[d];
+  if(o.a)S.items[d]=o.a; else delete S.items[d];
+  if(o.l)S.log[d]=o.l; else delete S.log[d];
   save(); render();
 }
-/* убрать блок из дня: разовую задачу удаляем совсем, шаблонную прячем на этот день */
-function dropFromDay(id,d){
-  var L=logOf(d),t=S.tasks.filter(function(x){return x.id===id})[0];
-  var ai=L.add.indexOf(id); if(ai>=0)L.add.splice(ai,1);
-  delete L.ovr[id]; delete L.done[id];
-  if(t&&t.date===d){S.tasks=S.tasks.filter(function(x){return x.id!==id});return 'del'}
-  if(L.skip.indexOf(id)<0)L.skip.push(id);
-  return 'skip';
+function snapAll(){return JSON.stringify({i:S.items,l:S.log})}
+function restoreAll(snap){
+  var o=JSON.parse(snap);
+  S.items=o.i; S.log=o.l; save(); render();
 }
-/* поставить готовую задачу в день, в том числе второй раз за день */
-var LASTPUT=null;
-function putInDay(tid,d){
-  var L=logOf(d),t=S.tasks.filter(function(x){return x.id===tid})[0];
-  LASTPUT=tid;
-  if(!t)return null;
-  var si=L.skip.indexOf(tid);
-  if(si>=0){L.skip.splice(si,1);return 'back'}
-  var mode=S.settings.mode,mn=(mode==='A'&&typeof t.minA==='number')?t.minA:t.min;
-  var here=instances(d).some(function(x){return x.id===tid});
-  if(!here&&mn>0&&!t.date){ if(L.add.indexOf(tid)<0)L.add.push(tid); return 'add' }
-  /* повтор того же дела или задача, у которой в этом режиме ноль минут: ставим копию на день */
-  if(!mn)mn=t.min||t.minA||30;
-  var c=T({title:t.title,dir:t.dir,min:mn,ord:(t.ord||500)+1,fix:false,days:[],date:d,core:false,
-           note:t.note||''});
-  S.tasks.push(c);
-  LASTPUT=c.id;
-  return 'copy';
+
+/* ===== копии дела в другие дни ===== */
+function dateList(from,until,wds){
+  var out=[],d=from,guard=0;
+  while(d<=until&&guard++<400){ if(!wds||!wds.length||wds.indexOf(wday(d))>=0)out.push(d); d=addD(d,1) }
+  return out;
 }
-/* что можно делать одновременно с этим блоком */
+function copyItemTo(d,id,dates,asSeries){
+  var t=findItem(d,id); if(!t)return 0;
+  if(asSeries&&!t.rep)t.rep='s-'+uid();
+  var n=0;
+  dates.forEach(function(dd){
+    if(dd===d)return;
+    var c=cloneItem(t,false);
+    if(!asSeries)c.rep=null;
+    dayListW(dd).push(c); n++;
+  });
+  return n;
+}
+/* убрать дело из всех будущих дней */
+function stopRepeat(d,id){
+  var t=findItem(d,id); if(!t||!t.rep)return 0;
+  var n=0,grp=t.rep;
+  t.rep=null;
+  for(var k in S.items){
+    if(k<=d)continue;
+    var had=S.items[k].length;
+    S.items[k]=S.items[k].filter(function(x){return x.rep!==grp});
+    n+=had-S.items[k].length;
+    if(!S.items[k].length)delete S.items[k];
+  }
+  return n;
+}
+/* сколько дней вперёд это дело ещё стоит */
+function repAhead(d,id){
+  var t=findItem(d,id); if(!t||!t.rep)return 0;
+  var n=0;
+  for(var k in S.items)if(k>d&&S.items[k].some(function(x){return x.rep===t.rep}))n++;
+  return n;
+}
+/* ближайший прошлый день той же недели, где что-то было */
+function lastSameWeekday(d){
+  var dd=addD(d,-7),guard=0;
+  while(guard++<12){ if(dayList(dd).length)return dd; dd=addD(dd,-7) }
+  return null;
+}
+/* перенести расклад прошлого такого же дня недели в пустой день */
+function fillFrom(src,dst){
+  var items=dayList(src).filter(function(x){return x.rep});
+  if(!items.length)return 0;
+  var map={},copies=[];
+  items.forEach(function(t){var c=cloneItem(t,true);map[t.id]=c.id;copies.push(c)});
+  copies.forEach(function(c){c.with=(c.with||[]).map(function(w){return map[w]}).filter(function(x){return x})});
+  var a=dayListW(dst),n=0;
+  copies.forEach(function(c){ if(!a.some(function(x){return x.rep===c.rep})){a.push(c);n++} });
+  if(!a.length)delete S.items[dst];
+  return n;
+}
+/* разложить повторы до указанной даты */
+function extendTo(upto){
+  var d=todayIso(),days=0,guard=0;
+  while(d<=upto&&guard++<400){
+    if(!dayList(d).length){
+      var src=lastSameWeekday(d);
+      if(src&&fillFrom(src,d))days++;
+    }
+    d=addD(d,1);
+  }
+  return days;
+}
+/* сколько дней впереди уже разложено */
+function plannedAhead(){
+  var d=todayIso(),n=0,guard=0;
+  while(guard++<400){ if(!dayList(d).length)break; n++; d=addD(d,1) }
+  return n;
+}
+/* что идёт одновременно с этим делом, в пределах дня */
 function sheetWith(id){
   var d=S.ui.date,p=planDay(d),host=p.items.filter(function(x){return x.id===id})[0];
-  var ht=byTask(id);
+  var ht=findItem(d,id);
   if(!host||!ht)return;
-  var hDays=(S.settings.mode==='A'&&ht.daysA)?ht.daysA:(ht.days||[]);
   var sel=(ht.with||[]);
-  var cand=S.tasks.filter(function(t){return t.active&&t.id!==id&&!t.date});
-  cand.sort(function(a,b){return (sel.indexOf(b.id)>=0?1:0)-(sel.indexOf(a.id)>=0?1:0)||((a.title<b.title)?-1:1)});
+  var cand=dayList(d).filter(function(t){return t.id!==id});
+  cand.sort(function(a,b){return (sel.indexOf(b.id)>=0?1:0)-(sel.indexOf(a.id)>=0?1:0)||((a.ord||500)-(b.ord||500))});
   var h='<h3>Вместе с «'+esc(shortName(host.title,24))+'»</h3>'+
-    '<div class="dim" style="font-size:12.5px;margin:-9px 0 13px">Отмеченные дела идут в то же время и накладкой не считаются. '+
-    'Например, в зале можно слушать ПДД и разбирать Инстаграм сразу. Отмечать можно сколько угодно дел. '+
-    'В дни, когда этого блока нет, отмеченное дело идёт своим чередом.</div>';
-  if(!cand.length)h+='<div class="dim" style="padding:2px 2px 12px;font-size:13px">Других задач пока нет.</div>';
+    '<div class="dim" style="font-size:12.5px;margin:-9px 0 13px">Отмеченные дела этого дня идут в то же время и накладкой не считаются. '+
+    'Например, в зале можно слушать ПДД и разбирать Инстаграм сразу. Отмечать можно сколько угодно дел.</div>';
+  if(!cand.length)h+='<div class="dim" style="padding:2px 2px 12px;font-size:13px">В этом дне больше ничего нет.</div>';
   else h+='<div class="picklist">'+cand.map(function(t){
       var on=sel.indexOf(t.id)>=0;
-      var tDays=(S.settings.mode==='A'&&t.daysA)?t.daysA:(t.days||[]);
-      var common=tDays.filter(function(x){return hDays.indexOf(x)>=0});
-      var sub=on?('идёт вместе, '+tSpan(t)):(common.length?('общих дней '+common.length+' · '+tSpan(t)):'дни не совпадают · '+tSpan(t));
+      var sub=on?('идёт вместе, '+hm(t.min)):((t.at?('метка '+t.at):'по порядку')+' · '+hm(t.min));
       return '<button class="pickrow'+(on?' on':'')+'" data-act="withTog" data-id="'+id+'" data-v="'+t.id+'">'+
-        '<i style="background:'+DIRS[t.dir].c+'"></i>'+
-        '<span class="pn">'+esc(t.title)+'<i class="sub'+(!on&&!common.length?' warn':'')+'">'+sub+'</i></span>'+
+        '<i style="background:'+catColor(t.dir)+'"></i>'+
+        '<span class="pn">'+esc(t.title)+'<i class="sub">'+sub+'</i></span>'+
         '<span class="pm">'+(on?'вместе':'добавить')+'</span></button>';
     }).join('')+'</div>';
   h+='<div class="row-btns" style="margin-top:14px">'+
@@ -2239,59 +2147,19 @@ function sheetWith(id){
      '<button class="btn ghost" data-act="closeSheet">Готово</button></div>';
   openSheet(h);
 }
-function sheetPick(rep){
-  var d=S.ui.date,p=planDay(d);
-  var inDay={};
-  p.items.forEach(function(x){if(!x.skipped)inDay[x.id]=x});
-  var rt=rep?p.items.filter(function(x){return x.id===rep})[0]:null;
-  var cand=S.tasks.filter(function(t){return t.active&&!t.date&&t.id!==rep});
-  cand.sort(function(a,b){return (DKEYS.indexOf(a.dir)-DKEYS.indexOf(b.dir))||((a.title<b.title)?-1:1)});
-  var h='<h3>'+(rt?'Чем заменить':'Что поставить в день')+'</h3>'+
-    '<div class="dim" style="font-size:12.5px;margin:-9px 0 13px">'+
-      (rt?'Встанет на место дела «'+esc(shortName(rt.title,22))+'», только на '+dateShort(d)+'. Расписание задачи не меняется.'
-         :'Задача встанет только в '+dateShort(d)+', в конец списка. Поднять её выше можно перетаскиванием.')+'</div>';
-  if(!cand.length)h+='<div class="dim" style="padding:2px 2px 12px;font-size:13px">Готовых задач нет. Создайте разовую.</div>';
-  else h+='<div class="picklist">'+cand.map(function(t){
-      var mn=(S.settings.mode==='A'&&typeof t.minA==='number')?t.minA:t.min;
-      if(!mn)mn=t.min||t.minA||30;
-      var st=inDay[t.id];
-      var sub=t.fix?('метка времени '+((S.settings.mode==='A'&&t.atA)?t.atA:t.at)):(rt?'встанет на место прежнего дела':'встанет в конец дня');
-      if(st)sub='уже в плане'+(st.fixG?(' на '+m2t(st.s)):(' под номером '+(st.num||1)))+' · поставлю ещё раз';
-      return '<button class="pickrow" data-act="pickTask" data-id="'+t.id+'" data-v="'+(rep||'')+'">'+
-        '<i style="background:'+DIRS[t.dir].c+'"></i>'+
-        '<span class="pn">'+esc(t.title)+'<i class="sub">'+sub+'</i></span>'+
-        '<span class="pm">'+hm(mn)+'</span></button>';
-    }).join('')+'</div>';
-  h+='<div class="row-btns" style="margin-top:14px">'+
-     (rt?'<button class="btn" data-act="skip" data-id="'+rep+'">Просто убрать блок</button>':'')+
-     '<button class="btn" data-act="addToday">Создать разовую</button>'+
-     '<button class="btn ghost" data-act="closeSheet">Отмена</button></div>';
-  openSheet(h);
-}
+/* записать часть времени */
 function sheetPart(id){
   var d=S.ui.date,p=planDay(d),o=p.items.filter(function(x){return x.id===id})[0];
   if(!o)return;
   var left=Math.max(5,o.min-(o.doneMin||0)),base=[15,30,45,60,90];
   if(base.indexOf(left)<0)base.push(left);base.sort(function(a,b){return a-b});
   openSheet('<h3>'+esc(o.title)+'</h3>'+
-    '<div class="dim" style="font-size:12.5px;margin:-8px 0 13px">Записано '+hm(o.doneMin||0)+' из '+hm(o.min)+'. Блок закроется сам, когда наберётся полностью.</div>'+
+    '<div class="dim" style="font-size:12.5px;margin:-8px 0 13px">Записано '+hm(o.doneMin||0)+' из '+hm(o.min)+'. Дело закроется само, когда время наберётся полностью.</div>'+
     '<div class="mins">'+base.map(function(x){return '<button data-pick="pmin" data-v="'+x+'">'+hm(x)+'</button>'}).join('')+'</div>'+
     '<div class="f"><label>Минут</label><input type="number" inputmode="numeric" id="p_min" value="'+left+'"></div>'+
     '<div class="row-btns"><button class="btn pri" data-act="savePart" data-id="'+id+'">Записать</button>'+
     '<button class="btn ghost" data-act="closeSheet">Отмена</button></div>');
 }
-function sheetTune(id){
-  var d=S.ui.date,p=planDay(d),o=p.items.filter(function(x){return x.id===id})[0];
-  if(!o)return;
-  TMP={};
-  openSheet('<h3>'+esc(o.title)+'</h3>'+
-    '<div class="dim" style="font-size:12.5px;margin:-8px 0 13px">Меняется только '+dateShort(d)+', сама задача остаётся прежней.</div>'+
-    minField('t',o.min,[20,30,45,60,90,120,180])+
-    timeField('t',!!o.fixG,o.at||m2t(o.s),'Поставить это дело на конкретный час только сегодня')+
-    '<div class="row-btns" style="margin-top:6px"><button class="btn pri" data-act="saveTune" data-id="'+id+'">Сохранить</button>'+
-    '<button class="btn" data-act="resetTune" data-id="'+id+'">Вернуть как в задаче</button></div>');
-}
-/* тикер таймера */
 function tickClock(){
   var el=document.getElementById('runclock');
   if(el&&S.ui.timer)el.textContent=' · идёт '+hm(Math.max(1,Math.round((Date.now()-S.ui.timer.t0)/60000)));
