@@ -121,6 +121,7 @@ html[data-theme="light"] .btn.pri{color:#fff}
 .tag.acc{color:var(--acc);border-color:color-mix(in srgb,var(--acc) 40%,transparent)}
 .tag.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
 .brk{display:flex;align-items:center;gap:10px;padding:3px 4px 3px 68px;font-size:11px;color:var(--dim2)}
+.whyrow{padding:0 6px 13px 68px;margin-top:-7px;font-size:11.5px;line-height:1.5;color:var(--dim)}
 .brk .l{flex:1;height:1px;background:var(--line2)}
 .pbar{height:3px;background:var(--line2);border-radius:3px;margin-top:7px;overflow:hidden}
 .pbar i{display:block;height:100%;background:var(--c,var(--acc));opacity:.8}
@@ -211,7 +212,9 @@ html[data-theme="light"] .btn.pri{color:#fff}
 .pickrow{display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:11px 12px;margin-bottom:7px;
   border:1px solid var(--line2);border-radius:12px;background:var(--panel2);color:var(--fg)}
 .pickrow i{width:3px;height:24px;border-radius:2px;flex:0 0 3px}
-.pickrow .pn{flex:1;min-width:0;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pickrow .pn{flex:1;min-width:0;font-size:14px;overflow:hidden}
+.pickrow .sub{display:block;font-style:normal;font-size:11px;line-height:1.35;color:var(--dim2);margin-top:3px}
+.pickrow .sub.warn{color:var(--warn)}
 .pickrow .pm{font-size:11.5px;color:var(--dim2);white-space:nowrap;font-variant-numeric:tabular-nums}
 .brkgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0 2px}
 .seg4{display:flex;gap:5px}
@@ -506,6 +509,8 @@ function instances(d){
            ord:(typeof t.ord==='number'?t.ord:50),par:t.par||null,after:t.after||null,floor:t.floor||0,
            gapAfter:(typeof t.gap==='number'?t.gap:null),ref:t};
     var ov=L.ovr[t.id]; if(ov){ if(ov.min)o.min=ov.min; if(ov.at!==undefined)o.at=ov.at;
+                                if(ov.after!==undefined)o.after=ov.after||null;
+                                if(typeof ov.floor==='number')o.floor=ov.floor;
                                 if(typeof ov.gap==='number')o.gapAfter=ov.gap; }
     out.push(o);
   }
@@ -609,12 +614,17 @@ function planDay(d){
     cur=win[wi].s; acc=0;   /* еда, пары и выезды сами разрывают серию работы */
     var guard=0;
     while(pend.length&&guard++<120){
-      var idx=-1,jump=null;
-      for(var k2=0;k2<pend.length;k2++){
-        var cf=pend[k2],caf=cf.after?t2m(cf.after):0;
-        /* перерыв в проверке не участвует: он занимает только место между делами и сам ужимается */
-        if(caf>cur){ if(caf+cf.min<=win[wi].e&&(jump===null||caf<jump))jump=caf; continue; }
-        if(cur+cf.min<=win[wi].e){idx=k2;break}
+      var idx=-1,jump=null,tie;
+      /* два захода: сначала дела, привязанные словом «не раньше», иначе свободное дело занимает
+         единственное окно привязанного, и привязанное вылетает из дня */
+      for(tie=0;tie<2&&idx<0;tie++){
+        for(var k2=0;k2<pend.length;k2++){
+          var cf=pend[k2],caf=cf.after?t2m(cf.after):0;
+          if(tie===0&&!cf.after)continue;
+          /* перерыв в проверке не участвует: он занимает только место между делами и сам ужимается */
+          if(caf>cur){ if(caf+cf.min<=win[wi].e&&(jump===null||caf<jump))jump=caf; continue; }
+          if(cur+cf.min<=win[wi].e){idx=k2;break}
+        }
       }
       if(idx<0){ if(jump!==null&&jump>cur){cur=jump;acc=0;continue} break; }
       var f=pend.splice(idx,1)[0];
@@ -628,7 +638,7 @@ function planDay(d){
       cur=f.e+got;
     }
   }
-  /* второй проход: то, что не влезло из-за «не раньше», ставим куда получится */
+  /* второй проход: добираем остатки в дырки между уже поставленными делами, «не раньше» соблюдаем */
   if(pend.length){
     var free2=[],cc;
     win.forEach(function(w){
@@ -639,13 +649,16 @@ function planDay(d){
       if(w.e-cc>=20)free2.push({s:cc,e:w.e});
     });
     for(var w2=0;w2<free2.length&&pend.length;w2++){
-      var c2=free2[w2].s,g2=0;
+      var c2=free2[w2].s,g2=0,st3=0;
       while(pend.length&&g2++<40){
         var j2=-1;
-        for(var k3=0;k3<pend.length;k3++){if(c2+pend[k3].min<=free2[w2].e){j2=k3;break}}
+        for(var k3=0;k3<pend.length;k3++){
+          var caf3=pend[k3].after?t2m(pend[k3].after):0,s3=Math.max(c2,caf3);
+          if(s3+pend[k3].min<=free2[w2].e){j2=k3;st3=s3;break}
+        }
         if(j2<0)break;
         var f3=pend.splice(j2,1)[0];
-        f3.s=c2;f3.e=c2+f3.min;f3.late=true;
+        f3.s=st3;f3.e=st3+f3.min;f3.late=true;
         var w3=gapWant(f3,BK,0);
         f3.gapWant=w3; f3.gapPlan=Math.min(w3,Math.max(0,free2[w2].e-f3.e));
         if(f3.gapPlan>0)breaks.push({s:f3.e,len:f3.gapPlan});
@@ -692,16 +705,49 @@ function planDay(d){
   var all=fixed.concat(floats.filter(function(f){return !f.over})).concat(pars);
   all.sort(function(a,b){return ((a.s==null?9999:a.s)-(b.s==null?9999:b.s))||((a.parallel?1:0)-(b.parallel?1:0))});
   var over=floats.filter(function(f){return f.over}).concat(items.filter(function(o){return o.par&&o.over}));
-  var planned=0,doneM=0,byDir={},occupied=0;
+  /* свободные окна по факту укладки: ровно те места, куда ещё может встать блок */
+  var occF=all.filter(function(o){return !o.skipped&&o.s!=null&&!o.parallel})
+     .map(function(o){return {s:clamp(o.s),e:clamp(o.e+(o.at?15:(o.gapPlan||0)))}})
+     .sort(function(a,b){return a.s-b.s});
+  var fw=[],cf2=start;
+  occF.forEach(function(b){ if(b.s>cf2)fw.push({s:cf2,e:Math.min(b.s,end)}); cf2=Math.max(cf2,b.e); });
+  if(cf2<end)fw.push({s:cf2,e:end});
+  fw=fw.filter(function(x){return x.e-x.s>=5});
+  var winMax=0; fw.forEach(function(x){ if(x.e-x.s>winMax)winMax=x.e-x.s });
+  /* почему блок не встал: причину считаем здесь, чтобы экран её просто показал */
+  var seen={};
+  all.concat(over).forEach(function(o){
+    if(o.skipped)return;
+    var key=o.title+'|'+o.min;
+    if(seen[key])o.dup=true; else seen[key]=true;
+  });
+  over.forEach(function(o){
+    var host=o.par?pick[o.id]:null;
+    if(o.par&&(!host||host.over||host.s==null)){
+      o.why='host'; o.whyHost=host?host.title:''; return;
+    }
+    var af=o.after?t2m(o.after):0,best=0,bestAll=0;
+    fw.forEach(function(x){
+      var l=x.e-x.s; if(l>bestAll)bestAll=l;
+      var l2=x.e-Math.max(x.s,af); if(l2>best)best=l2;
+    });
+    o.whyMax=best; o.whyAll=bestAll;
+    if(o.after&&bestAll>=o.min&&best<o.min)o.why='late';
+    else if(bestAll<o.min&&freeMin<o.min)o.why='full';
+    else o.why='space';
+  });
+  var planned=0,doneM=0,byDir={},occupied=0,overMin=0;
   items.forEach(function(o){
     if(o.skipped)return;
+    if(o.over){overMin+=o.min;return}      /* то, что не встало в день, не считаем планом */
     planned+=o.min; doneM+=Math.min(o.doneMin,o.min);
     byDir[o.dir]=(byDir[o.dir]||0)+o.min;
     if(!o.parallel)occupied+=o.min;
   });
   return {items:all,over:over,breaks:breaks,planned:planned,done:doneM,byDir:byDir,clash:clash,occupied:occupied,cut:CUTS.slice(),
           ratio:planned?doneM/planned:0,endAt:endAt,shape:L.shape||'norm',
-          winMin:Math.max(0,end-start),freeMin:Math.max(0,freeMin),gapMax:Math.max(0,gapMax)};
+          winMin:Math.max(0,end-start),freeMin:Math.max(0,freeMin),gapMax:Math.max(0,winMax),
+          overMin:overMin,freeWin:fw};
 }
 
 /* ---- оценка дня, серия, уровни ---- */
@@ -823,7 +869,8 @@ function viewDay(){
   /* сводка */
   var free=(p.freeMin!=null)?p.freeMin:Math.max(0,dayEnd()-dayStart()-(p.occupied||p.planned));
   h+='<div class="card"><div class="statrow">'+ring(p.ratio)+
-     '<div style="flex:1;min-width:0"><div style="font-size:15px">Сделано '+hm(p.done)+' из '+hm(p.planned)+'</div>'+
+     '<div style="flex:1;min-width:0"><div style="font-size:15px">Сделано '+hm(p.done)+' из '+hm(p.planned)+
+       (p.overMin?'<span style="color:var(--warn);font-size:12.5px"> + '+hm(p.overMin)+' не влезло</span>':'')+'</div>'+
      '<div class="dim" style="font-size:12.5px;margin-top:3px">Свободно '+hm(free)+' · день закрывается около '+m2t(p.endAt)+'</div>'+
      '<div class="load">'+DKEYS.map(function(k){
         var v=p.byDir[k]||0;if(!v)return '';
@@ -862,9 +909,10 @@ function viewDay(){
   if(p.over.length){
     h+='<div class="sect"><div class="lab">Не помещается в день</div><div class="line"></div></div>';
     h+='<div class="dim" style="font-size:12px;margin:-4px 0 10px;line-height:1.5">Свободно в сутках '+hm(p.freeMin||0)+
-       ', самый длинный промежуток '+hm(p.gapMax||0)+'. Блок встаёт только целиком, поэтому короткий промежуток его не берёт. '+
-       'Можно укоротить блок, сдвинуть якорь или перенести дело на завтра.</div>';
-    h+='<div class="card pad0" style="padding:6px 13px"><div class="tl">'+p.over.map(function(o){return itemHTML(o,d)}).join('')+'</div></div>';
+       ', самое длинное свободное окно '+hm(p.gapMax||0)+'. Под каждым блоком написано, почему он не встал; нажмите на блок, чтобы укоротить его, снять ограничение по времени или перенести на завтра.</div>';
+    h+='<div class="card pad0" style="padding:6px 13px"><div class="tl">'+p.over.map(function(o){
+         return itemHTML(o,d)+'<div class="whyrow">'+overWhy(o)+'</div>';
+       }).join('')+'</div></div>';
   }
   /* хвосты вчера */
   var y=addD(d,-1),yl=S.log[y],yused=!!(yl&&((yl.done&&Object.keys(yl.done).length)||(yl.skip&&yl.skip.length)));
@@ -890,6 +938,23 @@ function viewDay(){
      '<div><div class="lab">Уровень</div><b style="font-size:16px;padding-top:2px">'+rk.name+'</b></div>'+
      '<div><div class="lab">Часов всего</div><b>'+hmS(totalMin())+'</b></div></div>';
   V.innerHTML=h;
+}
+/* человеческое объяснение, почему блок не встал в день */
+function overWhy(o){
+  var t='';
+  if(o.why==='host')t='Идёт вместе с делом «'+esc((o.whyHost||'').split(',')[0])+'», а оно в день не встало. Поставьте его, и это встанет следом.';
+  else if(o.why==='late')t='Нужно '+hm(o.min)+' подряд и не раньше '+o.after+', а после '+o.after+' самое длинное свободное окно '+hm(o.whyMax||0)+'. Раньше в дне место есть.';
+  else if(o.why==='full')t='В сутках просто не осталось места: нужно '+hm(o.min)+' подряд, свободно всего '+hm(o.whyAll||0)+'.';
+  else t='Нужно '+hm(o.min)+' подряд, а самое длинное свободное окно '+hm(o.whyMax||o.whyAll||0)+'. Блок встаёт только целиком.';
+  if(o.dup)t+=' Это второй такой же блок в дне.';
+  return t;
+}
+/* сколько минут блок мог бы занять сегодня, если его укоротить */
+function overFit(o){
+  var m=Math.max(o.whyMax||0,0);
+  if(o.why==='late')m=o.whyMax||0;
+  m=Math.floor(m/5)*5;
+  return (m>=30&&m<o.min)?m:0;
 }
 /* приписка к блоку: только про свой перерыв, авто-паузы видны в самом плане */
 function brkNote(o){
@@ -1271,7 +1336,7 @@ function viewSet(){
     '<button class="btn sm" data-act="copyData">Скопировать текстом</button>'+
     '<button class="btn sm danger" data-act="reset">Сбросить всё</button></div>'+
     '<input type="file" id="fileIn" accept="application/json,.json" style="display:none"></div>';
-  h+='<div class="dim" style="font-size:11.5px;text-align:center;margin:18px 0 30px">devnprt.planner · сборка 9, ноябрь 2026 · работает без интернета</div>';
+  h+='<div class="dim" style="font-size:11.5px;text-align:center;margin:18px 0 30px">devnprt.planner · сборка 10, ноябрь 2026 · работает без интернета</div>';
   V.innerHTML=h;
 }
 
@@ -1323,7 +1388,10 @@ function sheetMenu(id){
   var h='<h3>'+esc(o.title)+'</h3>'+
     '<div class="dim" style="font-size:12px;margin:-9px 0 13px">'+
       (o.virt?'Подстановка вместо пар':(once?'Разовая задача, только на '+dateShort(d):'Повторяется по шаблону недели'))+'</div>'+
+    (o.over?'<div class="dim" style="font-size:12px;margin:-6px 0 12px;line-height:1.5;color:var(--warn)">'+overWhy(o)+'</div>':'')+
     '<div class="menu">'+
+    (o.over&&o.why==='late'?'<button data-act="freeAfter" data-id="'+id+'">Разрешить раньше '+o.after+', только сегодня</button>':'')+
+    (o.over&&overFit(o)?'<button data-act="fitHere" data-id="'+id+'" data-v="'+overFit(o)+'">Укоротить до '+hm(overFit(o))+' и поставить сегодня</button>':'')+
     '<button data-act="toggle" data-id="'+id+'">'+(o.done?'Снять отметку':'Отметить сделанным')+'</button>'+
     '<button data-act="part" data-id="'+id+'">Записать часть времени</button>'+
     '<button data-act="tune" data-id="'+id+'">Сдвинуть время, длительность или перерыв, только сегодня</button>'+
@@ -1507,6 +1575,10 @@ document.addEventListener('click',function(e){
       if(gp!=='')L.ovr[id].gap=Math.max(0,Math.min(240,parseInt(gp,10)||0));
       save(); closeSheet(); render(); break; }
     case 'resetTune': L=logOf(d); delete L.ovr[id]; save(); closeSheet(); render(); break;
+    case 'freeAfter': { L=logOf(d); L.ovr[id]=L.ovr[id]||{}; L.ovr[id].after='';
+      save(); closeSheet(); render(); toast('Ограничение по времени снято на сегодня'); break; }
+    case 'fitHere': { L=logOf(d); L.ovr[id]=L.ovr[id]||{}; L.ovr[id].min=parseInt(v,10)||30; L.ovr[id].floor=0;
+      save(); closeSheet(); render(); toast('Блок укорочен до '+hm(parseInt(v,10)||30)+' на сегодня'); break; }
     case 'skip': {
       var snapS=snapDay(d),how=dropFromDay(id,d);
       save(); closeSheet(); render();
@@ -1530,6 +1602,7 @@ document.addEventListener('click',function(e){
       var snapP=snapDay(d);
       if(v)dropFromDay(v,d);
       var res=putInDay(id,d);
+      if(res==='dupfail'&&!v){ closeSheet(); render(); toast('Такой блок уже стоит в дне и не помещается'); break; }
       save(); closeSheet(); render();
       toast(v?'Блок заменён':(res==='copy'?'Поставил ещё один такой блок':'Задача в плане дня'),
             function(){restoreDay(d,snapP)});
@@ -1732,6 +1805,8 @@ function putInDay(tid,d){
   var mode=S.settings.mode,mn=(mode==='A'&&typeof t.minA==='number')?t.minA:t.min;
   var here=instances(d).some(function(x){return x.id===tid});
   if(!here&&mn>0&&!t.date){ if(L.add.indexOf(tid)<0)L.add.push(tid); return 'add' }
+  /* такой блок уже стоит в дне и не помещается: второй точно так же не влезет */
+  if(here&&planDay(d).over.some(function(x){return x.id===tid||x.title===t.title}))return 'dupfail';
   /* повтор того же дела или задача, у которой в этом режиме ноль минут: ставим копию на день */
   if(!mn)mn=t.min||t.minA||30;
   var c=T({title:t.title,dir:t.dir,min:mn,at:null,days:[],date:d,core:false,
@@ -1743,7 +1818,9 @@ function putInDay(tid,d){
 }
 function sheetPick(rep){
   var d=S.ui.date,L=logOf(d),p=planDay(d);
-  var inDay={};p.items.concat(p.over).forEach(function(x){if(L.skip.indexOf(x.id)<0)inDay[x.id]=true});
+  var inDay={};
+  p.items.forEach(function(x){if(L.skip.indexOf(x.id)<0&&!x.skipped)inDay[x.id]={fits:x.s!=null,s:x.s}});
+  p.over.forEach(function(x){if(L.skip.indexOf(x.id)<0)inDay[x.id]={fits:false}});
   var rt=rep?p.items.concat(p.over).filter(function(x){return x.id===rep})[0]:null;
   var cand=S.tasks.filter(function(t){return t.active&&!t.date&&t.id!==rep});
   cand.sort(function(a,b){return (DKEYS.indexOf(a.dir)-DKEYS.indexOf(b.dir))||((a.title<b.title)?-1:1)});
@@ -1755,10 +1832,13 @@ function sheetPick(rep){
   else h+='<div class="picklist">'+cand.map(function(t){
       var mn=(S.settings.mode==='A'&&typeof t.minA==='number')?t.minA:t.min;
       if(!mn)mn=t.min||t.minA||30;
+      var st=inDay[t.id];
       return '<button class="pickrow" data-act="pickTask" data-id="'+t.id+'" data-v="'+(rep||'')+'">'+
         '<i style="background:'+DIRS[t.dir].c+'"></i>'+
-        '<span class="pn">'+esc(t.title)+'</span>'+
-        '<span class="pm">'+(inDay[t.id]?'ещё раз · ':'')+hm(mn)+'</span></button>';
+        '<span class="pn">'+esc(t.title)+
+          (st?'<i class="sub'+(st.fits?'':' warn')+'">'+(st.fits?'уже в плане на '+m2t(st.s)+', встанет ещё раз':'уже в плане, но не помещается в день')+'</i>':'')+
+        '</span>'+
+        '<span class="pm">'+hm(mn)+'</span></button>';
     }).join('')+'</div>';
   h+='<div class="row-btns" style="margin-top:14px">'+
      (rt?'<button class="btn" data-act="skip" data-id="'+rep+'">Просто убрать блок</button>':'')+
