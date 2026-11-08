@@ -27,6 +27,7 @@ html[data-theme="light"]{
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0;background:var(--bg);color:var(--fg)}
+html{scrollbar-gutter:stable}
 body{
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Inter,"Helvetica Neue",Arial,sans-serif;
   font-size:15px;line-height:1.5;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;
@@ -42,10 +43,11 @@ button{background:none;border:0;cursor:pointer;padding:0}
 .wrap{max-width:860px;margin:0 auto;padding:0 18px}
 
 /* ---------- shell ---------- */
-.top{position:sticky;top:0;z-index:30;background:color-mix(in srgb,var(--bg) 88%,transparent);
-  backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);
+.top{position:fixed;left:0;right:0;top:0;z-index:30;background:var(--bg);
   border-bottom:1px solid var(--line2);padding-top:env(safe-area-inset-top)}
-.top-in{max-width:860px;margin:0 auto;padding:13px 18px;display:flex;align-items:center;gap:12px}
+.top-in{max-width:860px;margin:0 auto;padding:9px 18px;min-height:56px;display:flex;align-items:center;gap:12px}
+.topgap{height:calc(57px + env(safe-area-inset-top))}
+#modeChip{min-width:104px;justify-content:center}
 .brand{font-size:14.5px;letter-spacing:.01em;font-weight:500;white-space:nowrap}
 .brand b{font-weight:600}
 .brand span{color:var(--acc)}
@@ -62,8 +64,7 @@ button{background:none;border:0;cursor:pointer;padding:0}
 .iconbtn:hover{color:var(--fg)}
 
 .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;justify-content:space-around;
-  background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
-  border-top:1px solid var(--line2);padding:8px 6px calc(8px + env(safe-area-inset-bottom))}
+  background:var(--bg);border-top:1px solid var(--line2);padding:8px 6px calc(8px + env(safe-area-inset-bottom))}
 .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--dim2);font-size:10px;letter-spacing:.04em;padding:4px 0}
 .tab svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
 .tab.on{color:var(--fg)}
@@ -266,8 +267,18 @@ textarea{min-height:64px;resize:vertical}
 .shclose{position:absolute;right:12px;top:6px;width:32px;height:32px;border-radius:50%;border:1px solid var(--line);
   background:var(--panel2);color:var(--dim);font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center}
 .shclose:active{background:var(--line2);color:var(--fg)}
-#sheet .row-btns{position:sticky;bottom:calc(-14px - env(safe-area-inset-bottom));z-index:5;background:var(--panel);
-  margin:16px 0 0;padding:12px 0 calc(14px + env(safe-area-inset-bottom));box-shadow:0 -14px 18px -14px rgba(0,0,0,.45)}
+#sheet #sheetBody>.row-btns:last-child{position:sticky;bottom:calc(-14px - env(safe-area-inset-bottom));z-index:5;
+  background:var(--panel);margin:16px 0 0;padding:13px 0 calc(14px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--line2)}
+.movebar{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin:0 0 15px;
+  background:var(--line);border:1px solid var(--line);border-radius:var(--rs);overflow:hidden}
+.movebar button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+  min-height:66px;padding:11px 5px;background:var(--panel2);color:var(--fg);
+  font-size:11.5px;line-height:1.25;letter-spacing:.01em;text-align:center}
+.movebar svg{width:17px;height:17px;stroke:var(--dim);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.movebar button:active{background:var(--accSoft)}
+.movebar button:active svg{stroke:var(--acc)}
+@media (hover:hover){.movebar button:hover svg{stroke:var(--acc)}}
 body.lock{position:fixed;left:0;right:0;width:100%;overflow:hidden}
 .mins{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
 .mins button{border:1px solid var(--line);border-radius:9px;padding:9px 13px;font-size:13.5px;color:var(--fg);background:var(--panel2)}
@@ -278,11 +289,22 @@ body.lock{position:fixed;left:0;right:0;width:100%;overflow:hidden}
 .sheet h3{font-size:17px;font-weight:400;margin:0 0 14px}
 .menu button{display:flex;width:100%;gap:11px;align-items:center;padding:14px 2px;border-bottom:1px solid var(--line2);font-size:15px;text-align:left;line-height:1.35}
 .menu button:last-child{border-bottom:0}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(88px + env(safe-area-inset-bottom));z-index:80;
-  background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:14px;font-size:13px;line-height:1.4;text-align:center;
-  max-width:min(92vw,460px);opacity:0;transition:.25s;pointer-events:none}
-.toast.on{opacity:1}
-.toast u{display:inline-block;margin-left:13px;color:var(--acc);text-decoration:none;border-bottom:1px solid currentColor;cursor:pointer}
+.toast{position:fixed;left:50%;transform:translateX(-50%) translateY(10px);bottom:calc(88px + env(safe-area-inset-bottom));z-index:80;
+  background:var(--panel2);color:var(--fg);border:1px solid var(--line);padding:0;border-radius:16px;
+  font-size:13px;line-height:1.45;text-align:left;overflow:hidden;
+  max-width:min(92vw,440px);opacity:0;pointer-events:none;
+  box-shadow:0 1px 0 rgba(255,255,255,.05) inset,0 20px 40px -20px rgba(0,0,0,.9);
+  transition:opacity .2s ease,transform .26s cubic-bezier(.2,.85,.3,1)}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast .tin{display:flex;align-items:stretch}
+.toast .tmsg{flex:1;min-width:0;align-self:center;padding:11px 15px;overflow-wrap:anywhere}
+.toast:not(.act) .tmsg{text-align:center}
+.toast .tundo{flex:0 0 auto;display:flex;align-items:center;padding:0 16px;min-height:46px;
+  border-left:1px solid var(--line);color:var(--acc);font-size:13px;font-weight:500;white-space:nowrap}
+.toast .tundo:active{background:var(--accSoft)}
+.toast .tbar{display:block;height:2px;background:var(--acc);opacity:.5;transform-origin:left center}
+.toast.act .tbar{animation:drain 5.2s linear forwards}
+@keyframes drain{from{transform:scaleX(1)}to{transform:scaleX(0)}}
 .toast.act{pointer-events:auto}
 #sheet.open ~ .toast{bottom:calc(50vh - 20px)}
 
@@ -326,6 +348,7 @@ body.lock{position:fixed;left:0;right:0;width:100%;overflow:hidden}
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>
   </button>
 </div></header>
+<div class="topgap"></div>
 
 <main id="view" class="wrap"></main>
 
@@ -406,9 +429,9 @@ function defaults(){
       norms:{B:{android:19,sites:16,pdd:12,content:7,body:4.5},A:{android:12,sites:6,pdd:8,content:3,body:3}}},
     tasks:[
       /* --- учёба, работа, дорога --- */
-      T({title:'ТИСБИ, пары',dir:'study',min:170,at:'08:00',days:[1],weeks:'all',optional:true,note:'Дистант: ходить необязательно, практику всё равно сдавать'}),
+      T({id:'tisbi-mon',title:'ТИСБИ, пары',dir:'study',min:170,at:'08:00',days:[1],weeks:'all',optional:true,note:'Дистант: ходить необязательно, практику всё равно сдавать'}),
       T({id:'tisbi-sat-odd',title:'ТИСБИ, пары',dir:'study',min:260,at:'08:00',days:[6],weeks:'odd',optional:true,note:'Нечётная неделя: 8:00 до 12:20'}),
-      T({title:'ТИСБИ, пары',dir:'study',min:170,at:'09:30',days:[6],weeks:'even',optional:true,note:'Чётная неделя: 9:30 до 12:20'}),
+      T({id:'tisbi-sat-even',title:'ТИСБИ, пары',dir:'study',min:170,at:'09:30',days:[6],weeks:'even',optional:true,note:'Чётная неделя: 9:30 до 12:20'}),
       T({id:'t-bank',title:'Работа в банке',dir:'life',min:720,at:'09:00',days:[2,3,4,5],only:'A',note:'Вторник до пятницы, 9:00 до 21:00'}),
       T({id:'t-road1',title:'Дорога на работу',dir:'life',min:30,at:'08:30',days:[2,3,4,5],only:'A'}),
       T({id:'t-road2',title:'Дорога домой',dir:'life',min:30,at:'21:00',days:[2,3,4,5],only:'A'}),
@@ -477,85 +500,114 @@ if(!S||!S.tasks){S=defaults();save()}
   S.v=2;save();
 })();
 if(!Array.isArray(S.income)){S.income=[];S.v=3;save()}
-/* --- переход на модель «у каждого дела своё время», выполняется один раз --- */
-(function migrate4(){
-  if((S.v||1)>=4)return;
-  var D=defaults(),TPL={},i;
+/* ===== сборка недели по схеме =====
+   Чинит состояние любого возраста: ставит времена схемы, убирает мусор прежних версий,
+   раскладывает дни с жёсткими событиями. Вызывается при переезде и кнопкой в настройках. */
+function rebuildSchedule(){
+  var D=defaults(),TPL={},wasMode=S.settings.mode,KEEP=['at','atA','days','daysA','min','minA','par','only','core','optional','note','dir','title'];
   D.tasks.forEach(function(t){if(t.id&&!t.date)TPL[t.id]=t});
-  /* 1. сетка времён шаблона ставится целиком: она рассчитана так, чтобы дни не пересекались */
-  var KEEP=['at','atA','days','daysA','min','minA','par','only','core','optional','note','dir','title'];
+  /* 1. дела схемы обновляются целиком: время, длительность и дни посчитаны как одно расписание */
   S.tasks.forEach(function(t){
     var ref=TPL[t.id];
-    /* дела из схемы обновляем целиком: время, длительность и дни рассчитаны как одно расписание */
     if(ref)KEEP.forEach(function(f){t[f]=(ref[f]&&typeof ref[f]==='object')?JSON.parse(JSON.stringify(ref[f])):ref[f]});
     delete t.after;delete t.floor;delete t.gap;delete t.ord;
   });
-  /* 2. новые дела схемы, которых в старом наборе не было */
-  ['t-android1s','t-sites2b'].forEach(function(id){
-    if(!S.tasks.some(function(t){return t.id===id})&&TPL[id])S.tasks.push(JSON.parse(JSON.stringify(TPL[id])));
+  var renameId=function(a,b){
+    for(var dk in S.log){var L=S.log[dk];
+      if(L.done&&L.done[a]!=null){L.done[b]=L.done[a];delete L.done[a]}
+      if(L.ovr&&L.ovr[a]){L.ovr[b]=L.ovr[a];delete L.ovr[a]}
+      if(L.skip){var i=L.skip.indexOf(a);if(i>=0)L.skip[i]=b}
+      if(L.add){var j=L.add.indexOf(a);if(j>=0)L.add[j]=b}
+    }
+  };
+  Object.keys(TPL).forEach(function(id){
+    if(S.tasks.some(function(t){return t.id===id}))return;
+    var ref=TPL[id];
+    /* прежние версии хранили часть дел со случайным ключом: узнаём по названию и неделям */
+    var cand=S.tasks.filter(function(t){return !t.date&&!TPL[t.id]&&t.title===ref.title&&(t.weeks||'all')===(ref.weeks||'all')});
+    var same=cand.filter(function(t){return String((t.days||[]).join())===String((ref.days||[]).join())})[0]||cand[0];
+    if(same){
+      renameId(same.id,id); same.id=id;
+      KEEP.forEach(function(f){same[f]=(ref[f]&&typeof ref[f]==='object')?JSON.parse(JSON.stringify(ref[f])):ref[f]});
+    } else S.tasks.push(JSON.parse(JSON.stringify(ref)));
   });
-  /* 3. журнал и настройки: убрать следы прежней модели */
+  /* 2. журнал: следы прежней модели и закрепления времени на сегодня и дальше */
   for(var dk in S.log){var Lg=S.log[dk];
     delete Lg.shape;delete Lg.ord;delete Lg.focus;
-    if(Lg.ovr)for(var ok in Lg.ovr){delete Lg.ovr[ok].after;delete Lg.ovr[ok].floor;delete Lg.ovr[ok].gap;
-      /* прежние закрепления времени боролись с автораскладкой, теперь они только мешают;
-         прошлые дни не трогаем, это история */
+    if(Lg.ovr)for(var ok in Lg.ovr){
+      delete Lg.ovr[ok].after;delete Lg.ovr[ok].floor;delete Lg.ovr[ok].gap;
       if(!Lg.ovr[ok].at||dk>=todayIso())delete Lg.ovr[ok].at;
-      if(!Lg.ovr[ok].at&&!Lg.ovr[ok].min)delete Lg.ovr[ok];}
+      if(!Lg.ovr[ok].at&&!Lg.ovr[ok].min)delete Lg.ovr[ok];
+    }
   }
   if(S.settings){delete S.settings.brk;delete S.settings.breaks}
-  /* 4. дни с вождением и собеседованием: расставить, если человек сам там ничего не менял */
+  /* 3. дни, где всё двигает жёсткое событие */
   for(var fk in DAYFIX){
+    if(fk<todayIso())continue;
     var Lf=logOf(fk);
-    for(var fi in DAYFIX[fk])if(!Lf.ovr[fi])Lf.ovr[fi]=JSON.parse(JSON.stringify(DAYFIX[fk][fi]));
+    for(var fi in DAYFIX[fk])Lf.ovr[fi]=JSON.parse(JSON.stringify(DAYFIX[fk][fi]));
   }
-  /* 5. своим задачам без времени ищем окно, свободное во все их дни */
+  /* 4. свои задачи: тем, у кого нет времени или кто теперь пересекается, ищем окно */
   var probe=function(wd){var dd=todayIso(),n;for(n=0;n<8;n++){if(wday(dd)===wd)return dd;dd=addD(dd,1)}return dd};
-  var wasMode=S.settings.mode;
-  S.tasks.filter(function(t){return !t.at}).forEach(function(t){
+  var mine=S.tasks.filter(function(t){return !TPL[t.id]&&t.active!==false});
+  var hits=function(t){
+    var dts=t.date?[t.date]:((t.days&&t.days.length?t.days:[]).map(probe)),out=false;
+    if(!dts.length)return false;
+    ['B','A'].forEach(function(md){S.settings.mode=md;
+      dts.forEach(function(dt){planDay(dt).items.forEach(function(o){if(o.id===t.id&&o.clash)out=true})})});
+    S.settings.mode=wasMode;
+    return out;
+  };
+  mine.forEach(function(t){
+    if(t.date&&t.date<todayIso())return;
+    if(t.at&&!hits(t))return;
     var dates=t.date?[t.date]:((t.days&&t.days.length?t.days:[1,2,3,4,5,6,7]).map(probe));
-    var busy=[];
-    /* окно должно быть свободно и в полном дне, и в дне со сменой */
-    ['B','A'].forEach(function(md){
-      S.settings.mode=md;
+    var mn=t.min||30,busyOf={B:[],A:[]};
+    ['B','A'].forEach(function(md){S.settings.mode=md;
       dates.forEach(function(dt){planDay(dt).items.forEach(function(o){
-        if(o.id!==t.id&&!o.skipped&&!o.parallel)busy.push([o.s,o.e])})});
+        if(o.id!==t.id&&!o.skipped&&!o.parallel)busyOf[md].push([o.s,o.e])})});
     });
     S.settings.mode=wasMode;
-    var mn=t.min||30;
     var scan=function(list){
-      var x=dayStart(),ok;
+      var x=dayStart(),ok,b;
       while(x+mn<=dayEnd()){
         ok=true;
-        for(var b=0;b<list.length;b++)if(x<list[b][1]&&list[b][0]<x+mn){ok=false;break}
+        for(b=0;b<list.length;b++)if(x<list[b][1]&&list[b][0]<x+mn){ok=false;break}
         if(ok)return x;
         x+=5;
       }
       return null;
     };
-    var own=[];
-    dates.forEach(function(dt){planDay(dt).items.forEach(function(o){
-      if(o.id!==t.id&&!o.skipped&&!o.parallel)own.push([o.s,o.e])})});
-    /* сначала окно, свободное в обоих режимах; если его нет, хотя бы в текущем; иначе после последнего дела */
-    var pos=scan(busy);
-    if(pos==null){
-      pos=scan(own);
-      /* в один из режимов дело не влезает: в таких днях его просто не будет */
-      if(pos!=null&&!t.date){ if(wasMode==='A')t.min=0; else t.minA=0; }
-    }
-    if(pos==null){ pos=dayStart(); own.forEach(function(b){if(b[1]>pos)pos=b[1]}); pos+=10; }
-    t.at=m2t(Math.min(pos,23*60+55));
+    /* самая большая дырка дня: запасной вариант, когда целиком дело никуда не влезает */
+    var widest=function(list){
+      var mb=[],best=dayStart(),bl=-1,c=dayStart(),i;
+      list.slice().sort(function(a,b){return a[0]-b[0]}).forEach(function(b){
+        var l=mb[mb.length-1];if(l&&b[0]<=l[1])l[1]=Math.max(l[1],b[1]);else mb.push([b[0],b[1]]);});
+      for(i=0;i<mb.length;i++){ if(mb[i][0]-c>bl){bl=mb[i][0]-c;best=c} if(mb[i][1]>c)c=mb[i][1] }
+      if(dayEnd()-c>bl)best=c;
+      return best;
+    };
+    var other=(wasMode==='A')?'B':'A';
+    var pBoth=scan(busyOf.B.concat(busyOf.A)),pCur=scan(busyOf[wasMode]),pOth=scan(busyOf[other]);
+    if(pBoth!=null)t.at=m2t(pBoth);
+    else if(pCur!=null){ t.at=m2t(pCur); if(!t.date){ if(wasMode==='A')t.min=0; else t.minA=0 } }
+    else if(pOth!=null){ t.at=m2t(pOth); if(!t.date){ if(other==='A')t.min=0; else t.minA=0 } }
+    else t.at=m2t(widest(busyOf[wasMode]));
   });
-  /* 6. что всё же пересеклось из-за прежних правок, раскладываем по датам */
-  var seen={},dd=todayIso();
+  /* 5. что всё же пересеклось, раскладываем по датам в текущем режиме */
+  var seen={},dd=todayIso(),i;
   for(i=0;i<60;i++){seen[dd]=1;dd=addD(dd,1)}
   for(var lk in S.log)seen[lk]=1;
-  /* раскладываем только в том режиме, которым человек пользуется: правки на день общие для обоих */
   Object.keys(seen).sort().forEach(function(dt){
     if(dt<todayIso())return;
     if(planDay(dt).clash.length)packDay(dt);
   });
-  S.v=4;save();
+}
+/* --- переезд на модель «у каждого дела своё время» и починка после неудачной версии --- */
+(function migrate5(){
+  if((S.v||1)>=5)return;
+  rebuildSchedule();
+  S.v=5;save();
 })();
 if(!S.ui)S.ui={view:'day',date:todayIso(),week:monday(todayIso()),timer:null};
 S.ui.date=S.ui.date||todayIso();
@@ -724,6 +776,9 @@ var IC={
   plus:'<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
   grip:'<svg viewBox="0 0 24 24"><circle cx="9" cy="5.5" r="1.6"/><circle cx="15" cy="5.5" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18.5" r="1.6"/><circle cx="15" cy="18.5" r="1.6"/></svg>',
   left:'<svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>',
+  up:'<svg viewBox="0 0 24 24"><path d="M12 19.5V5M6 11l6-6 6 6"/></svg>',
+  down:'<svg viewBox="0 0 24 24"><path d="M12 4.5V19M6 13l6 6 6-6"/></svg>',
+  swap:'<svg viewBox="0 0 24 24"><path d="M8 20.5V4M4 8l4-4 4 4M16 3.5V20M12 16l4 4 4-4"/></svg>',
   right:'<svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>'
 };
 var TABS=[
@@ -743,7 +798,9 @@ function renderTabs(){
 var UNDO=null;
 function toast(t,undo){
   var e=document.getElementById('toast');
-  e.innerHTML=esc(t)+(undo?' <u data-act="undo">Вернуть</u>':'');
+  e.innerHTML='<div class="tin"><span class="tmsg">'+esc(t)+'</span>'+
+    (undo?'<button type="button" class="tundo" data-act="undo">Вернуть</button>':'')+'</div>'+
+    (undo?'<i class="tbar"></i>':'');
   e.classList.toggle('act',!!undo);UNDO=undo||null;
   e.classList.add('on');clearTimeout(e._t);
   e._t=setTimeout(function(){e.classList.remove('on');e.classList.remove('act');UNDO=null},undo?5200:1700);
@@ -1175,12 +1232,14 @@ function viewSet(){
   h+='<div class="f" style="margin-top:14px"><label>Цель по деньгам в месяц, ₽</label><input type="number" inputmode="numeric" data-set="goal" value="'+(s.goal||0)+'"></div></div>';
   h+='<div class="card"><div class="h2">Данные</div>'+
     '<div class="dim" style="font-size:12.5px;margin-bottom:12px">Всё хранится в самом браузере, на сервер ничего не уходит. Чтобы перенести между телефоном и компьютером, выгрузите файл и загрузите его на другом устройстве.</div>'+
+    '<div class="row-btns" style="margin-bottom:12px"><button class="btn sm" data-act="rebuildAsk">Пересобрать расписание недели</button></div>'+
+    '<div class="dim" style="font-size:11.5px;margin:-6px 0 14px;line-height:1.55">Вернёт делам из схемы их время, длительность и дни, снимет переносы на сегодня и дальше. Отметки о сделанном, доходы и свои задачи останутся.</div>'+
     '<div class="row-btns"><button class="btn sm" data-act="export">Выгрузить файл</button>'+
     '<button class="btn sm" data-act="importBtn">Загрузить файл</button>'+
     '<button class="btn sm" data-act="copyData">Скопировать текстом</button>'+
     '<button class="btn sm danger" data-act="reset">Сбросить всё</button></div>'+
     '<input type="file" id="fileIn" accept="application/json,.json" style="display:none"></div>';
-  h+='<div class="dim" style="font-size:11.5px;text-align:center;margin:18px 0 30px">devnprt.planner · сборка 12, ноябрь 2026 · работает без интернета</div>';
+  h+='<div class="dim" style="font-size:11.5px;text-align:center;margin:18px 0 30px">devnprt.planner · сборка 12.3, ноябрь 2026 · работает без интернета</div>';
   V.innerHTML=h;
 }
 
@@ -1235,10 +1294,10 @@ function sheetMenu(id){
       (o.virt?'подстановка вместо пар':(once?'разовая задача, только на '+dateShort(d):'повторяется по шаблону недели'))+'</div>'+
     (o.clash?'<div class="dim" style="font-size:12px;margin:-6px 0 12px;line-height:1.5;color:var(--warn)">Пересекается по времени с другим делом. Сдвиньте одно из них или нажмите «разложить» в шапке дня.</div>':'')+
     (o.late?'<div class="dim" style="font-size:12px;margin:-6px 0 12px;line-height:1.5;color:var(--warn)">Заканчивается после отбоя '+S.settings.sleep+'.</div>':'')+
-    (mvb?'<div class="row-btns" style="margin:0 0 13px">'+
-       '<button class="btn sm" data-act="mvUp" data-id="'+id+'">Выше</button>'+
-       '<button class="btn sm" data-act="mvDn" data-id="'+id+'">Ниже</button>'+
-       '<button class="btn sm" data-act="swapAsk" data-id="'+id+'">Поменять местами</button></div>':'')+
+    (mvb?'<div class="movebar">'+
+       '<button type="button" data-act="mvUp" data-id="'+id+'">'+IC.up+'<span>Выше</span></button>'+
+       '<button type="button" data-act="mvDn" data-id="'+id+'">'+IC.down+'<span>Ниже</span></button>'+
+       '<button type="button" data-act="swapAsk" data-id="'+id+'">'+IC.swap+'<span>Поменять местами</span></button></div>':'')+
     '<div class="menu">'+
     '<button data-act="toggle" data-id="'+id+'">'+(o.done?'Снять отметку':'Отметить сделанным')+'</button>'+
     '<button data-act="part" data-id="'+id+'">Записать часть времени</button>'+
@@ -1483,12 +1542,18 @@ document.addEventListener('click',function(e){
       L=logOf(d);
       var at=document.getElementById('t_at').value,mn=parseInt(document.getElementById('t_min').value,10);
       if(!at){toast('Поставьте время начала');break}
-      var curT=startOf(d,id),snpT=snapDay(d),dlt=(curT!=null)?(t2m(at)-curT):0;
+      var cur=planDay(d).items.filter(function(x){return x.id===id})[0];
+      var snpT=snapDay(d),curS=cur?cur.s:null,curE=cur?cur.e:null;
+      var newMin=(mn>0?mn:(cur?cur.min:30));
+      /* хвост дня двигается на столько, на сколько уехал КОНЕЦ блока: и от переноса, и от новой длительности */
+      var dlt=(curE!=null)?((t2m(at)+newMin)-curE):0;
+      var nsh=0;
       L.ovr[id]=L.ovr[id]||{};
       L.ovr[id].at=at; if(mn>0)L.ovr[id].min=mn;
-      if(TMP.shift&&dlt&&curT!=null)shiftAfter(d,curT+1,dlt,id);
+      if(TMP.shift&&dlt&&curS!=null)nsh=shiftAfter(d,curS+1,dlt,id);
       save(); closeSheet(); render();
-      toast((TMP.shift&&dlt)?'Сдвинул дело и всё, что после':'Сохранено',function(){restoreDay(d,snpT)});
+      toast(nsh?('Сдвинул дело и следом ещё '+nsh+(nsh%10===1&&nsh%100!==11?' дело':(nsh%10>=2&&nsh%10<=4&&(nsh%100<10||nsh%100>=20)?' дела':' дел')))
+               :(TMP.shift?'Сохранено, двигать после нечего':'Сохранено'),function(){restoreDay(d,snpT)});
       break; }
     case 'resetTune': L=logOf(d); delete L.ovr[id]; save(); closeSheet(); render(); break;
     case 'skip': {
@@ -1544,10 +1609,21 @@ document.addEventListener('click',function(e){
       toast(moveMsg(d,id,null)+', '+moveMsg(d,v,null).toLowerCase(),function(){restoreDay(d,snpS)});
       break; }
     case 'packDay': {
-      var snpK=snapDay(d),mv=packDay(d);
-      if(!mv){toast('Накладок нет');break}
+      var snpK=snapDay(d),was=planDay(d).clash.length,mv=packDay(d),now=planDay(d).clash.length;
+      if(!mv){ if(was)toast('Эти дела стоят в одно время намеренно, сдвинуть их нечем'); else toast('Накладок нет'); break }
       save(); render();
-      toast('Разложил день, сдвинул дел: '+mv,function(){restoreDay(d,snpK)});
+      toast(now?('Разложил, что смог: осталось накладок '+now)
+               :('Разложил день, сдвинул дел: '+mv),function(){restoreDay(d,snpK)});
+      break; }
+    case 'rebuildAsk': openSheet('<h3>Пересобрать расписание недели</h3>'+
+      '<div class="dim" style="font-size:13px;line-height:1.55;margin:-6px 0 4px">Делам из схемы вернётся их время, длительность и дни недели. Переносы, сделанные на сегодня и дальше, снимутся. '+
+      'Отметки о сделанном, доходы, клиенты и ваши собственные задачи останутся на месте.</div>'+
+      '<div class="row-btns" style="margin-top:16px"><button class="btn pri" data-act="rebuildDo">Пересобрать</button>'+
+      '<button class="btn ghost" data-act="closeSheet">Отмена</button></div>'); break;
+    case 'rebuildDo': {
+      var snpB=JSON.stringify(S);
+      rebuildSchedule(); save(); closeSheet(); render();
+      toast('Расписание пересобрано',function(){S=JSON.parse(snpB);save();render()});
       break; }
     case 'addToday': closeSheet(); sheetDayTask(); break;
     case 'addDay': {
@@ -1739,9 +1815,13 @@ function swapTimes(d,a,b){
 }
 /* сдвинуть всё, что начинается не раньше указанного времени */
 function shiftAfter(d,fromS,delta,exceptId){
-  var p=planDay(d),n=0;
+  var p=planDay(d),L=logOf(d),n=0;
   p.items.filter(function(x){return !x.skipped&&x.id!==exceptId&&x.s>=fromS})
-    .forEach(function(x){ moveBlock(d,x.id,x.s+delta); n++ });
+    .forEach(function(x){
+      L.ovr[x.id]=L.ovr[x.id]||{};
+      L.ovr[x.id].at=m2t(Math.max(0,Math.min(23*60+55,x.s+delta)));
+      n++;
+    });
   return n;
 }
 /* свободное место под блок: сначала пробуем желаемое время, потом первую дырку */
@@ -1760,15 +1840,28 @@ function freeSlot(d,min,prefer){
 }
 /* разложить день без накладок: каждое следующее дело после предыдущего */
 function packDay(d){
-  var list=planDay(d).items.filter(function(x){return !x.skipped&&!x.parallel})
-    .sort(function(a,b){return a.s-b.s});
-  var prev=null,moved=0,i;
-  for(i=0;i<list.length;i++){
-    var x=list[i],ns=x.s;
+  var p=planDay(d),L=logOf(d);
+  var set=function(id,ns){L.ovr[id]=L.ovr[id]||{};L.ovr[id].at=m2t(Math.max(0,Math.min(23*60+55,ns)))};
+  var act=p.items.filter(function(x){return !x.skipped}),groups=[],leads=[];
+  /* главное дело и всё, что идёт вместе с ним, двигаются одним куском */
+  act.forEach(function(x){if(!x.parallel){var g={lead:x,kids:[],s:x.s,e:x.e};groups.push(g);leads.push(g)}});
+  act.forEach(function(x){
+    if(!x.parallel)return;
+    var h=null,i;
+    for(i=0;i<leads.length;i++){var y=leads[i].lead;
+      if((x.par===y.id||x.par===y.dir)&&y.s<x.e&&x.s<y.e){h=leads[i];break}}
+    if(h){h.kids.push(x);h.s=Math.min(h.s,x.s);h.e=Math.max(h.e,x.e)}
+    else groups.push({lead:x,kids:[],s:x.s,e:x.e});
+  });
+  groups.sort(function(a,b){return (a.s-b.s)||(b.e-b.s)-(a.e-a.s)});
+  var prev=null,moved=0;
+  groups.forEach(function(g){
+    var ns=g.s,len=g.e-g.s;
     if(prev!=null&&ns<prev)ns=prev+10;
-    if(ns!==x.s){moveBlock(d,x.id,ns);moved++}
-    prev=ns+x.min;
-  }
+    var dl=ns-g.s;
+    if(dl){set(g.lead.id,g.lead.s+dl);g.kids.forEach(function(k){set(k.id,k.s+dl)});moved++}
+    prev=ns+len;
+  });
   return moved;
 }
 /* что сказать человеку после перестановки */
