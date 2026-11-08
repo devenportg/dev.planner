@@ -214,6 +214,9 @@ html[data-theme="light"] .btn.pri{color:#fff}
 .pickrow .pn{flex:1;min-width:0;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pickrow .pm{font-size:11.5px;color:var(--dim2);white-space:nowrap;font-variant-numeric:tabular-nums}
 .brkgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0 2px}
+.seg4{display:flex;gap:5px}
+.seg4 button{flex:1;min-width:0;text-align:center;padding:9px 4px;font-size:12.5px;border:1px solid var(--line);border-radius:9px;color:var(--dim);background:var(--panel2)}
+.seg4 button.on{color:var(--fg);border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:var(--accSoft)}
 .brkgrid .f{display:grid;grid-template-rows:28px auto;gap:0;margin:0}
 .brkgrid label{font-size:10px;letter-spacing:.1em;line-height:1.3;align-self:end;padding-bottom:6px}
 .mbar{display:flex;gap:1px;margin:15px 0 0;background:var(--line2);border-radius:var(--rs);overflow:hidden}
@@ -363,7 +366,7 @@ function defaults(){
   return {
     v:1,
     settings:{mode:'B',wake:'06:00',sleep:'23:00',theme:'dark',goal:60000,
-      brk:{on:true,short:10,long:15,big:45,after:210},
+      brk:{mode:'norm',short:10,long:15,big:45,after:210},
       parity:{serial:wserial('2026-11-02'),odd:false},breaks:true,
       norms:{B:{android:19,sites:16,pdd:12,content:7,body:4.5},A:{android:12,sites:6,pdd:8,content:3,body:3}}},
     tasks:[
@@ -444,15 +447,39 @@ document.documentElement.setAttribute('data-theme',S.settings.theme||'dark');
 function isOdd(d){var p=S.settings.parity;return (Math.abs(wserial(d)-p.serial)%2===0)?p.odd:!p.odd}
 function logOf(d){if(!S.log[d])S.log[d]={};var L=S.log[d];L.done=L.done||{};L.skip=L.skip||[];L.ovr=L.ovr||{};L.add=L.add||[];return L}
 /* настройки перерывов: один источник правды для укладки, настроек и подписей */
+var BRKP={tight:{short:5,long:10,big:30,after:240},norm:{short:10,long:15,big:45,after:210},free:{short:15,long:25,big:60,after:150}};
+var BRKT={off:'Без пауз',tight:'Короткие',norm:'Обычные',free:'Длинные',custom:'Свои'};
 function brkCfg(){
-  var st=S.settings;
-  if(!st.brk||typeof st.brk!=='object')st.brk={on:(st.breaks!==false),short:10,long:15,big:45,after:210};
-  var b=st.brk,num=function(v,dflt,lo,hi){v=parseInt(v,10);if(isNaN(v))v=dflt;return Math.max(lo,Math.min(hi,v))};
-  b.on=(b.on!==false);
+  var st=S.settings,k,p;
+  var num=function(v,dflt,lo,hi){v=parseInt(v,10);if(isNaN(v))v=dflt;return Math.max(lo,Math.min(hi,v))};
+  if(!st.brk||typeof st.brk!=='object')st.brk={mode:(st.breaks===false?'off':'norm')};
+  var b=st.brk;
   b.short=num(b.short,10,0,90); b.long=num(b.long,15,0,120);
   b.big=num(b.big,45,0,240);    b.after=num(b.after,210,45,900);
+  if(!b.mode){                       /* старые настройки переносим на ближайший ритм */
+    b.mode=(b.on===false||(b.on===undefined&&st.breaks===false))?'off':'custom';
+    if(b.mode!=='off')for(k in BRKP){p=BRKP[k];if(p.short===b.short&&p.long===b.long&&p.big===b.big&&p.after===b.after)b.mode=k}
+  }
+  if(b.mode!=='off'&&b.mode!=='custom'&&!BRKP[b.mode])b.mode='norm';
+  if(BRKP[b.mode]){p=BRKP[b.mode];b.short=p.short;b.long=p.long;b.big=p.big;b.after=p.after}
+  b.on=(b.mode!=='off');
   st.breaks=b.on;
   return b;
+}
+/* сколько отдыха просит блок: своё значение задачи важнее ритма */
+function gapWant(f,BK,acc){
+  if(typeof f.gapAfter==='number')return Math.max(0,Math.min(240,f.gapAfter));
+  if(!BK.on||f.min<30)return 0;          /* после короткого дела отдых не нужен */
+  var g=(f.min>=90?BK.long:BK.short);
+  if(acc>=BK.after&&BK.big>g)g=BK.big;   /* подряд набралось много работы: большая пауза */
+  return g;
+}
+/* человеческое описание текущего ритма: ровно то, что делает укладка */
+function brkText(b){
+  if(!b.on)return 'Пауз нет: следующее дело начинается сразу, как закончилось предыдущее. Отдых остаётся только там, где его даёт сам день: еда, пары, выезды.';
+  return 'После дела от получаса до полутора часов пауза '+hm(b.short)+', после длинного '+hm(b.long)+
+         '. Дела короче получаса идут без паузы. Когда подряд набирается '+hm(b.after)+' работы, пауза '+hm(b.big)+
+         '; счёт начинается заново после каждого дела с точным временем. Перед парами, выездом, сном и любым другим делом с точным временем пауза срезается: там отдых даёт сама смена занятия. Пауза никогда не выкидывает дело из дня и не двигает его на другое время, она занимает только свободное место между делами.';
 }
 var SHAPES={norm:'Обычный',focus:'Фокус',half:'Половина',easy:'Лёгкий',off:'Выходной'};
 var CUTS=[];
@@ -579,25 +606,26 @@ function planDay(d){
   /* уже сделанное укладываем первым: это факт, а не план */
   pend.sort(function(a,b){return (b.done?1:0)-(a.done?1:0)});
   for(var wi=0;wi<win.length;wi++){
-    cur=win[wi].s;
+    cur=win[wi].s; acc=0;   /* еда, пары и выезды сами разрывают серию работы */
     var guard=0;
     while(pend.length&&guard++<120){
       var idx=-1,jump=null;
       for(var k2=0;k2<pend.length;k2++){
         var cf=pend[k2],caf=cf.after?t2m(cf.after):0;
-        /* заданный вручную перерыв держим вместе с блоком, иначе он теряется перед якорем */
-        var need=cf.min+(typeof cf.gapAfter==='number'?cf.gapAfter:0);
-        if(caf>cur){ if(caf+need<=win[wi].e&&(jump===null||caf<jump))jump=caf; continue; }
-        if(cur+need<=win[wi].e){idx=k2;break}
+        /* перерыв в проверке не участвует: он занимает только место между делами и сам ужимается */
+        if(caf>cur){ if(caf+cf.min<=win[wi].e&&(jump===null||caf<jump))jump=caf; continue; }
+        if(cur+cf.min<=win[wi].e){idx=k2;break}
       }
       if(idx<0){ if(jump!==null&&jump>cur){cur=jump;acc=0;continue} break; }
       var f=pend.splice(idx,1)[0];
       f.s=cur;f.e=cur+f.min;
-      var gap=BK.on?(f.min>=90?BK.long:BK.short):0; acc+=f.min;
-      if(BK.on&&acc>=BK.after){gap=BK.big;acc=0}
-      if(typeof f.gapAfter==='number')gap=f.gapAfter;   /* свой перерыв у блока важнее общего правила */
-      breaks.push({s:f.e,len:gap});
-      cur=f.e+gap;
+      acc+=f.min;
+      var want=gapWant(f,BK,acc);
+      if(BK.on&&acc>=BK.after)acc=0;
+      var got=Math.min(want,Math.max(0,win[wi].e-f.e)); /* до якоря отдых уже есть, лишнее срезаем */
+      f.gapWant=want; f.gapPlan=got;
+      if(got>0)breaks.push({s:f.e,len:got});
+      cur=f.e+got;
     }
   }
   /* второй проход: то, что не влезло из-за «не раньше», ставим куда получится */
@@ -606,7 +634,8 @@ function planDay(d){
     win.forEach(function(w){
       var used=floats.filter(function(f){return f.s!=null&&f.s>=w.s&&f.e<=w.e});
       cc=w.s;used.sort(function(a,b){return a.s-b.s}).forEach(function(u){
-        if(u.s-cc>=20)free2.push({s:cc,e:u.s});cc=Math.max(cc,u.e+10);});
+        if(u.s-cc>=20)free2.push({s:cc,e:u.s});
+        cc=Math.max(cc,u.e+Math.max(10,u.gapPlan||0));});   /* чужую паузу не занимаем */
       if(w.e-cc>=20)free2.push({s:cc,e:w.e});
     });
     for(var w2=0;w2<free2.length&&pend.length;w2++){
@@ -617,7 +646,10 @@ function planDay(d){
         if(j2<0)break;
         var f3=pend.splice(j2,1)[0];
         f3.s=c2;f3.e=c2+f3.min;f3.late=true;
-        c2=f3.e+(typeof f3.gapAfter==='number'?f3.gapAfter:(BK.on?BK.short:0));
+        var w3=gapWant(f3,BK,0);
+        f3.gapWant=w3; f3.gapPlan=Math.min(w3,Math.max(0,free2[w2].e-f3.e));
+        if(f3.gapPlan>0)breaks.push({s:f3.e,len:f3.gapPlan});
+        c2=f3.e+f3.gapPlan;
       }
     }
   }
@@ -809,6 +841,7 @@ function viewDay(){
   h+='<div class="card pad0" style="padding:6px 13px"><div class="tl">';
   if(!p.items.length&&!p.over.length)h+='<div class="dim" style="padding:22px 4px;text-align:center">На этот день ничего не запланировано</div>';
   var nowM=(new Date()).getHours()*60+(new Date()).getMinutes(),nowShown=false;
+  var bmap={};(p.breaks||[]).forEach(function(b){if(b.len>0&&b.len>(bmap[b.s]||0))bmap[b.s]=b.len});
   var shown=p.items.filter(function(o){return !o.skipped});
   var runEnd=null;
   shown.forEach(function(o,idx){
@@ -818,8 +851,9 @@ function viewDay(){
     /* подпись только между настоящими соседями: совмещённые блоки идут в то же время */
     var nx=shown[idx+1];
     if(nx&&nx.s!=null&&runEnd!=null&&!nx.parallel&&nx.s-runEnd>=5){
-      var g=nx.s-runEnd;
-      h+='<div class="brk"><span>'+(g<=60?'перерыв '+g+' мин':'свободно '+hm(g))+'</span><div class="l"></div></div>';
+      var g=nx.s-runEnd,bl=Math.min(bmap[runEnd]||0,g);
+      h+='<div class="brk"><span>'+(bl>0?'перерыв '+hm(bl)+(g-bl>=20?' · свободно '+hm(g-bl):'')
+          :'свободно '+hm(g))+'</span><div class="l"></div></div>';
     }
   });
   if(!shown.length)h+='<div class="dim" style="padding:22px 4px;text-align:center">Ничего не осталось. Добавьте задачу кнопкой выше.</div>';
@@ -857,6 +891,15 @@ function viewDay(){
      '<div><div class="lab">Часов всего</div><b>'+hmS(totalMin())+'</b></div></div>';
   V.innerHTML=h;
 }
+/* приписка к блоку: только про свой перерыв, авто-паузы видны в самом плане */
+function brkNote(o){
+  if(o.s==null||o.over||typeof o.gapAfter!=='number')return '';
+  var w=o.gapWant||0,g=(typeof o.gapPlan==='number'?o.gapPlan:0);
+  if(!w)return ' · без перерыва';
+  if(g>=w)return ' · перерыв '+hm(w);
+  if(g>0)return ' · перерыв '+hm(g)+' вместо '+hm(w);
+  return ' · перерыв не нужен, дальше якорь';
+}
 function itemHTML(o,d){
   var run=S.ui.timer&&S.ui.timer.id===o.id&&S.ui.timer.date===d;
   var part=o.doneMin>0&&!o.done;
@@ -874,7 +917,7 @@ function itemHTML(o,d){
       (o.clash?'<span class="tag warn">накладка по времени</span>':'')+
     '</div>'+
     '<div class="meta">'+DIRS[o.dir].t+' · '+hm(o.min)+
-      (typeof o.gapAfter==='number'?' · перерыв после '+hm(o.gapAfter):'')+
+      brkNote(o)+
       (part?' · сделано '+hm(o.doneMin):'')+(run?'<span id="runclock"> · идёт</span>':'')+'</div>'+
     (o.note?'<div class="note">'+esc(o.note)+'</div>':'')+
     (part?'<div class="pbar"><i style="width:'+Math.min(100,o.doneMin/o.min*100)+'%"></i></div>':'')+
@@ -1197,14 +1240,20 @@ function viewSet(){
   h+='<div class="card"><div class="h2">День</div>'+
     '<div style="display:flex;gap:12px"><div class="f" style="flex:1"><label>Подъём</label><input type="time" data-set="wake" value="'+s.wake+'"></div>'+
     '<div class="f" style="flex:1"><label>Отбой</label><input type="time" data-set="sleep" value="'+s.sleep+'"></div></div>'+
-    '<div class="trow"><div class="mid"><div class="nm">Закладывать перерывы</div><div class="mt">Если выключить, блоки встанут вплотную друг к другу</div></div>'+
-    '<button class="sw'+(bk.on?' on':'')+'" data-act="togBreaks"><i></i></button></div>'+
-    (bk.on?'<div class="brkgrid">'+
+    '<div class="trow" style="display:block"><div class="nm">Перерывы</div>'+
+    '<div class="mt" style="margin:3px 0 10px">Пауза между двумя делами подряд. Чем длиннее дело, тем длиннее пауза.</div>'+
+    '<div class="seg4">'+['off','tight','norm','free'].map(function(k){
+      return '<button data-act="brkMode" data-v="'+k+'" class="'+(bk.mode===k?'on':'')+'">'+BRKT[k]+'</button>'}).join('')+'</div>'+
+    (bk.mode==='custom'?'<div class="dim" style="font-size:11.5px;margin-top:8px">Сейчас стоят свои значения. Нажмите любой ритм выше, чтобы вернуться к готовому.</div>':'')+
+    '<div class="dim" style="font-size:11.5px;margin:10px 0 0;line-height:1.55">'+brkText(bk)+'</div>'+
+    (bk.on?'<button class="btn sm" style="margin-top:11px" data-act="brkAdv">'+(S.ui.brkAdv?'Скрыть точные значения':'Настроить точно')+'</button>':'')+
+    (bk.on&&S.ui.brkAdv?'<div class="brkgrid">'+
       '<div class="f"><label>Обычный, мин</label><input type="number" inputmode="numeric" data-brk="short" value="'+bk.short+'"></div>'+
       '<div class="f"><label>Длинный блок, мин</label><input type="number" inputmode="numeric" data-brk="long" value="'+bk.long+'"></div>'+
       '<div class="f"><label>Большая пауза, мин</label><input type="number" inputmode="numeric" data-brk="big" value="'+bk.big+'"></div>'+
       '<div class="f"><label>Пауза через, мин</label><input type="number" inputmode="numeric" data-brk="after" value="'+bk.after+'"></div></div>'+
-      '<div class="dim" style="font-size:11.5px;margin:4px 0 2px;line-height:1.5">Длинный блок это от полутора часов. Большая пауза встаёт, когда подряд отработано столько минут, сколько в последнем поле. Совмещённые дела идут в одно время, перерыва между ними нет. Свой перерыв у блока задаётся в карточке задачи и важнее этих правил.</div>':'')+
+      '<div class="dim" style="font-size:11.5px;margin:4px 0 2px;line-height:1.5">Длинное дело это от полутора часов. Любая правка здесь переводит перерывы в режим «свои значения».</div>':'')+
+    '</div>'+
     '<div class="trow"><div class="mid"><div class="nm">Текущая неделя: '+(isOdd(todayIso())?'нечётная':'чётная')+'</div><div class="mt">Влияет на субботние пары: 8:00 или 9:30</div></div>'+
     '<button class="btn sm" data-act="parity">Переключить</button></div>'+
     '<div class="trow" style="border-bottom:0"><div class="mid"><div class="nm">Тема</div><div class="mt">Тёмная или светлая</div></div>'+
@@ -1222,7 +1271,7 @@ function viewSet(){
     '<button class="btn sm" data-act="copyData">Скопировать текстом</button>'+
     '<button class="btn sm danger" data-act="reset">Сбросить всё</button></div>'+
     '<input type="file" id="fileIn" accept="application/json,.json" style="display:none"></div>';
-  h+='<div class="dim" style="font-size:11.5px;text-align:center;margin:18px 0 30px">devnprt.planner · сборка 8, ноябрь 2026 · работает без интернета</div>';
+  h+='<div class="dim" style="font-size:11.5px;text-align:center;margin:18px 0 30px">devnprt.planner · сборка 9, ноябрь 2026 · работает без интернета</div>';
   V.innerHTML=h;
 }
 
@@ -1311,8 +1360,9 @@ function sheetTask(id){
    '<div style="display:flex;gap:12px"><div class="f" style="flex:1"><label>Не раньше</label><input type="time" id="f_after" value="'+(t.after||'')+'"></div>'+
    '<div class="f" style="flex:1"><label>Не короче, мин</label><input type="number" inputmode="numeric" id="f_floor" value="'+(t.floor||0)+'"></div></div>'+
    '<div class="dim" style="font-size:11.5px;margin:-8px 0 14px">«Не короче» держит блок в лёгкие дни: короче этого он не станет, а если совсем не вмещается, уйдёт из дня целиком.</div>'+
-   '<div class="f"><label>Перерыв после блока, мин</label><input type="number" inputmode="numeric" id="f_gap" placeholder="по общему правилу" value="'+(typeof t.gap==='number'?t.gap:'')+'"></div>'+
-   '<div class="dim" style="font-size:11.5px;margin:-8px 0 14px">Пусто значит по правилу из настроек. Ноль значит следующее дело начнётся сразу, без паузы.</div>'+
+   '<div class="f"><label>Перерыв после блока</label><div class="seg" id="f_gap">'+
+     GAPS.map(function(x){return '<button data-pick="gap" data-v="'+x[0]+'" class="'+(String(typeof t.gap==='number'?t.gap:'')===x[0]?'on':'')+'">'+x[1]+'</button>'}).join('')+'</div></div>'+
+   '<div class="dim" style="font-size:11.5px;margin:-8px 0 14px">«Как в настройках» значит по общему ритму. Заданная пауза соблюдается целиком, если следом идёт другое дело, и срезается, если сразу за блоком начинается дело с точным временем: пары, выезд, смена.</div>'+
    '<div style="display:flex;gap:12px">'+
    '<div class="f" style="flex:1"><label>Совмещается с</label><div class="seg" id="f_par">'+
      [['','нет']].concat(DKEYS.map(function(k){return [k,DIRS[k].t]})).map(function(x){
@@ -1328,10 +1378,11 @@ function sheetTask(id){
    '<div class="row-btns" style="margin-top:16px"><button class="btn pri" data-act="saveTask" data-id="'+(nw?'':t.id)+'">Сохранить</button>'+
    (nw?'':'<button class="btn danger" data-act="delTask" data-id="'+t.id+'">'+(t.date?'Удалить':'Удалить из всех недель')+'</button>')+
    '<button class="btn ghost" data-act="closeSheet">Отмена</button></div>';
-  TMP={dir:t.dir,days:eDays.slice(),weeks:t.weeks,core:!!t.core,par:t.par||'',mA:mA};
+  TMP={dir:t.dir,days:eDays.slice(),weeks:t.weeks,core:!!t.core,par:t.par||'',mA:mA,gap:(typeof t.gap==='number'?String(t.gap):'')};
   openSheet(h);
 }
 var TMP={};
+var GAPS=[['','как в настройках'],['0','без паузы'],['10','10 мин'],['15','15 мин'],['30','30 мин'],['45','45 мин'],['60','1 час']];
 function sheetMoney(id){
   var r=id?S.income.filter(function(x){return x.id===id})[0]:null,nw=!r;
   r=r||{id:uid(),title:'',kind:'job',sum:'',date:todayIso(),hours:''};
@@ -1394,6 +1445,7 @@ document.addEventListener('click',function(e){
     if(p==='stage'){TMP.stage=+v;el.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',+b.dataset.v===+v)})}
     if(p==='day'){var n=+v,i=TMP.days.indexOf(n);if(i<0)TMP.days.push(n);else TMP.days.splice(i,1);el.classList.toggle('on')}
     if(p==='core'){TMP.core=!TMP.core;el.classList.toggle('on')}
+    if(p==='gap'){TMP.gap=v;el.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.dataset.v===v)})}
     if(p==='par'){TMP.par=v;el.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.dataset.v===v)})}
     if(p==='kind'){TMP.kind=v;el.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.dataset.v===v)})}
     if(p==='qdone'){TMP.qdone=!TMP.qdone;el.classList.toggle('on')}
@@ -1417,7 +1469,8 @@ document.addEventListener('click',function(e){
       toast('Текущая неделя теперь '+(isOdd(todayIso())?'нечётная':'чётная')); break;
     case 'theme': S.settings.theme=S.settings.theme==='dark'?'light':'dark';
       document.documentElement.setAttribute('data-theme',S.settings.theme); save(); render(); break;
-    case 'togBreaks': { var bb=brkCfg(); bb.on=!bb.on; S.settings.breaks=bb.on; save(); render(); break; }
+    case 'brkMode': { var bb=brkCfg(); bb.mode=v; brkCfg(); save(); render(); break; }
+    case 'brkAdv': { S.ui.brkAdv=!S.ui.brkAdv; save(); render(); break; }
     case 'shape': sheetShape(); break;
     case 'pickShape': L=logOf(d); L.shape=v; if(v!=='focus')delete L.focus; save(); closeSheet(); render(); break;
     case 'pickFocus': L=logOf(d); L.shape='focus'; L.focus=v; save(); closeSheet(); render(); break;
@@ -1448,7 +1501,7 @@ document.addEventListener('click',function(e){
     case 'saveTune': {
       L=logOf(d);
       var at=document.getElementById('t_at').value,mn=parseInt(document.getElementById('t_min').value,10);
-      var gp=document.getElementById('t_gap').value;
+      var gp=(TMP.gap==null?'':String(TMP.gap));
       L.ovr[id]={at:at||null,min:mn||undefined};
       if(!at)L.ovr[id].at=null;
       if(gp!=='')L.ovr[id].gap=Math.max(0,Math.min(240,parseInt(gp,10)||0));
@@ -1506,7 +1559,7 @@ document.addEventListener('click',function(e){
       nt.at=document.getElementById('f_at').value||null;
       nt.after=document.getElementById('f_after').value||null;
       nt.floor=parseInt(document.getElementById('f_floor').value,10)||0;
-      var gv=document.getElementById('f_gap').value;
+      var gv=(TMP.gap==null?'':String(TMP.gap));
       nt.gap=(gv===''?null:Math.max(0,Math.min(240,parseInt(gv,10)||0)));
       nt.par=TMP.par||null;
       nt.date=document.getElementById('f_date').value||null;
@@ -1614,7 +1667,7 @@ document.addEventListener('change',function(e){
     save(); if(k!=='goal')render();
   }
   if(el.dataset.norm){S.settings.norms[S.settings.mode][el.dataset.norm]=parseFloat(el.value)||0;save()}
-  if(el.dataset.brk){var bc=brkCfg();bc[el.dataset.brk]=parseInt(el.value,10)||0;brkCfg();save();render()}
+  if(el.dataset.brk){var bc=brkCfg();bc.mode='custom';bc[el.dataset.brk]=parseInt(el.value,10)||0;brkCfg();save();render()}
   if(el.id==='fileIn'&&el.files&&el.files[0]){
     var fr=new FileReader();
     fr.onload=function(){try{var o=JSON.parse(fr.result);if(!o.tasks)throw 0;S=o;save();render();toast('Данные загружены')}catch(err){toast('Файл не подходит')}};
@@ -1728,11 +1781,14 @@ function sheetPart(id){
 function sheetTune(id){
   var d=S.ui.date,p=planDay(d),o=p.items.concat(p.over).filter(function(x){return x.id===id})[0];
   if(!o)return;
+  TMP={gap:(typeof o.gapAfter==='number'?String(o.gapAfter):'')};
   openSheet('<h3>'+esc(o.title)+'</h3>'+
     '<div style="display:flex;gap:12px"><div class="f" style="flex:1"><label>Время</label><input type="time" id="t_at" value="'+(o.at||'')+'"></div>'+
     '<div class="f" style="flex:1"><label>Минут</label><input type="number" inputmode="numeric" id="t_min" value="'+o.min+'"></div>'+
-    '<div class="f" style="flex:1"><label>Перерыв после</label><input type="number" inputmode="numeric" id="t_gap" placeholder="авто" value="'+(typeof o.gapAfter==='number'?o.gapAfter:'')+'"></div></div>'+
-    '<div class="dim" style="font-size:12px">Меняется только этот день, шаблон остаётся прежним. Перерыв пустой значит по общему правилу, ноль значит следующий блок сразу.</div>'+
+    '</div>'+
+    '<div class="f"><label>Перерыв после</label><div class="seg" id="t_gap">'+
+      GAPS.map(function(x){return '<button data-pick="gap" data-v="'+x[0]+'" class="'+(String(typeof o.gapAfter==='number'?o.gapAfter:'')===x[0]?'on':'')+'">'+x[1]+'</button>'}).join('')+'</div></div>'+
+    '<div class="dim" style="font-size:12px">Меняется только этот день, шаблон остаётся прежним.</div>'+
     '<div class="row-btns" style="margin-top:16px"><button class="btn pri" data-act="saveTune" data-id="'+id+'">Сохранить</button>'+
     '<button class="btn" data-act="resetTune" data-id="'+id+'">Вернуть как в шаблоне</button></div>');
 }
