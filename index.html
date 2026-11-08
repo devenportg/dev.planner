@@ -383,6 +383,20 @@ function T(o){
   for(var k in o)b[k]=o[k];
   return b;
 }
+/* дни, где всё двигает жёсткое событие: вождение и собеседование.
+   Время соседних дел на эти даты задано сразу, чтобы день открывался уже разложенным. */
+var DAYFIX={
+  '2026-11-07':{'t-android2':{at:'17:10',min:90},'t-gym':{at:'18:50'},'t-pdd2':{at:'18:50'},
+                't-pdd1':{at:'20:30'},'t-dinner':{at:'21:40'}},
+  '2026-11-09':{'t-lunch':{at:'11:00'},'t-android1s':{at:'14:10'},'t-sites2':{at:'15:50'},
+                't-gym':{at:'18:30'},'t-pdd2':{at:'18:30'},'t-pdd1':{at:'20:10'}},
+  '2026-11-14':{'v-pract':{at:'10:10'}},
+  '2026-11-15':{'t-pract':{at:'14:00'},'t-edit':{at:'15:40'},'t-dinner':{at:'18:00'},'t-pdd1':{at:'21:10'}}
+};
+var DAYFIX_NOTE={'2026-11-07':'вождение 15:00, вечер сдвинут',
+  '2026-11-09':'собеседование 12:00, день собран вокруг него',
+  '2026-11-14':'вождение 8:00, пары закрыты практикой',
+  '2026-11-15':'вождение 19:00, ужин и ПДД раздвинуты'};
 function defaults(){
   var t=todayIso();
   return {
@@ -422,7 +436,8 @@ function defaults(){
       T({id:'t-pdd3',title:'ПДД, повторение в дороге',dir:'pdd',min:30,minA:30,at:'21:00',days:[2,3,4,5],only:'A',par:'t-road2',note:'Вместе с дорогой домой'}),
       T({id:'t-insta',title:'Инстаграм: сторис, ответы, публикация',dir:'content',min:20,minA:20,at:'22:30',days:[1,2,3,4,5,6,7],daysA:[1,6,7]})
     ],
-    log:{'2026-11-14':{done:{},skip:['tisbi-sat-odd'],ovr:{},note:'вождение 8:00, пары закрыты практикой'}},
+    log:(function(){var L={},k;for(k in DAYFIX)L[k]={done:{},skip:(k==='2026-11-14'?['tisbi-sat-odd']:[]),
+          ovr:JSON.parse(JSON.stringify(DAYFIX[k])),note:DAYFIX_NOTE[k]||''};return L})(),
     clients:[], reels:[], income:[], shield:{}, ui:{view:'day',date:t,week:monday(t),timer:null}
   };
 }
@@ -465,32 +480,81 @@ if(!Array.isArray(S.income)){S.income=[];S.v=3;save()}
 /* --- переход на модель «у каждого дела своё время», выполняется один раз --- */
 (function migrate4(){
   if((S.v||1)>=4)return;
-  var D=defaults(),AT={},ATA={},DD={};
-  D.tasks.forEach(function(t){if(t.id&&!t.date){AT[t.id]=t.at;if(t.atA)ATA[t.id]=t.atA;DD[t.id]=t}});
-  if(!S.tasks.some(function(t){return t.id==='t-android1s'})){
-    var sat=D.tasks.filter(function(t){return t.id==='t-android1s'})[0];
-    if(sat)S.tasks.push(sat);
-  }
+  var D=defaults(),TPL={},i;
+  D.tasks.forEach(function(t){if(t.id&&!t.date)TPL[t.id]=t});
+  /* 1. сетка времён шаблона ставится целиком: она рассчитана так, чтобы дни не пересекались */
+  var KEEP=['at','atA','days','daysA','min','minA','par','only','core','optional','note','dir','title'];
   S.tasks.forEach(function(t){
-    if(!t.at&&AT[t.id])t.at=AT[t.id];
-    if(!t.atA&&ATA[t.id])t.atA=ATA[t.id];
-    if(t.id==='t-android1'&&DD[t.id]){t.days=DD[t.id].days.slice();t.daysA=DD[t.id].daysA.slice()}
+    var ref=TPL[t.id];
+    /* дела из схемы обновляем целиком: время, длительность и дни рассчитаны как одно расписание */
+    if(ref)KEEP.forEach(function(f){t[f]=(ref[f]&&typeof ref[f]==='object')?JSON.parse(JSON.stringify(ref[f])):ref[f]});
     delete t.after;delete t.floor;delete t.gap;delete t.ord;
   });
-  /* задачам, которых нет в шаблоне, раздаём свободное время подряд */
-  var busy={},step=600;
-  S.tasks.forEach(function(t){if(t.at)busy[t.at]=1});
-  S.tasks.forEach(function(t){
-    if(t.at)return;
-    while(busy[m2t(step)]&&step<22*60)step+=30;
-    t.at=m2t(step);busy[t.at]=1;step+=30;
+  /* 2. новые дела схемы, которых в старом наборе не было */
+  ['t-android1s','t-sites2b'].forEach(function(id){
+    if(!S.tasks.some(function(t){return t.id===id})&&TPL[id])S.tasks.push(JSON.parse(JSON.stringify(TPL[id])));
   });
+  /* 3. журнал и настройки: убрать следы прежней модели */
   for(var dk in S.log){var Lg=S.log[dk];
     delete Lg.shape;delete Lg.ord;delete Lg.focus;
     if(Lg.ovr)for(var ok in Lg.ovr){delete Lg.ovr[ok].after;delete Lg.ovr[ok].floor;delete Lg.ovr[ok].gap;
-      if(Lg.ovr[ok].at==='')delete Lg.ovr[ok].at;}
+      /* прежние закрепления времени боролись с автораскладкой, теперь они только мешают;
+         прошлые дни не трогаем, это история */
+      if(!Lg.ovr[ok].at||dk>=todayIso())delete Lg.ovr[ok].at;
+      if(!Lg.ovr[ok].at&&!Lg.ovr[ok].min)delete Lg.ovr[ok];}
   }
   if(S.settings){delete S.settings.brk;delete S.settings.breaks}
+  /* 4. дни с вождением и собеседованием: расставить, если человек сам там ничего не менял */
+  for(var fk in DAYFIX){
+    var Lf=logOf(fk);
+    for(var fi in DAYFIX[fk])if(!Lf.ovr[fi])Lf.ovr[fi]=JSON.parse(JSON.stringify(DAYFIX[fk][fi]));
+  }
+  /* 5. своим задачам без времени ищем окно, свободное во все их дни */
+  var probe=function(wd){var dd=todayIso(),n;for(n=0;n<8;n++){if(wday(dd)===wd)return dd;dd=addD(dd,1)}return dd};
+  var wasMode=S.settings.mode;
+  S.tasks.filter(function(t){return !t.at}).forEach(function(t){
+    var dates=t.date?[t.date]:((t.days&&t.days.length?t.days:[1,2,3,4,5,6,7]).map(probe));
+    var busy=[];
+    /* окно должно быть свободно и в полном дне, и в дне со сменой */
+    ['B','A'].forEach(function(md){
+      S.settings.mode=md;
+      dates.forEach(function(dt){planDay(dt).items.forEach(function(o){
+        if(o.id!==t.id&&!o.skipped&&!o.parallel)busy.push([o.s,o.e])})});
+    });
+    S.settings.mode=wasMode;
+    var mn=t.min||30;
+    var scan=function(list){
+      var x=dayStart(),ok;
+      while(x+mn<=dayEnd()){
+        ok=true;
+        for(var b=0;b<list.length;b++)if(x<list[b][1]&&list[b][0]<x+mn){ok=false;break}
+        if(ok)return x;
+        x+=5;
+      }
+      return null;
+    };
+    var own=[];
+    dates.forEach(function(dt){planDay(dt).items.forEach(function(o){
+      if(o.id!==t.id&&!o.skipped&&!o.parallel)own.push([o.s,o.e])})});
+    /* сначала окно, свободное в обоих режимах; если его нет, хотя бы в текущем; иначе после последнего дела */
+    var pos=scan(busy);
+    if(pos==null){
+      pos=scan(own);
+      /* в один из режимов дело не влезает: в таких днях его просто не будет */
+      if(pos!=null&&!t.date){ if(wasMode==='A')t.min=0; else t.minA=0; }
+    }
+    if(pos==null){ pos=dayStart(); own.forEach(function(b){if(b[1]>pos)pos=b[1]}); pos+=10; }
+    t.at=m2t(Math.min(pos,23*60+55));
+  });
+  /* 6. что всё же пересеклось из-за прежних правок, раскладываем по датам */
+  var seen={},dd=todayIso();
+  for(i=0;i<60;i++){seen[dd]=1;dd=addD(dd,1)}
+  for(var lk in S.log)seen[lk]=1;
+  /* раскладываем только в том режиме, которым человек пользуется: правки на день общие для обоих */
+  Object.keys(seen).sort().forEach(function(dt){
+    if(dt<todayIso())return;
+    if(planDay(dt).clash.length)packDay(dt);
+  });
   S.v=4;save();
 })();
 if(!S.ui)S.ui={view:'day',date:todayIso(),week:monday(todayIso()),timer:null};
