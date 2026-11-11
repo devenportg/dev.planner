@@ -95,7 +95,25 @@ html[data-theme="light"] .btn.pri{color:#fff}
 
 /* ---------- day ---------- */
 .dayhead{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+.dayhead.tight{align-items:center;gap:10px;margin:20px 0 0}
+.dayhead.tight .h1{margin:0;line-height:1.16;flex:0 1 auto}
+.dayhead.tight .datenav{gap:5px}
+.dayhead.tight .iconbtn{width:30px;height:30px;border-radius:9px;background:transparent}
+.dayhead.tight .iconbtn svg{width:16px;height:16px}
 .datenav{display:flex;gap:6px;align-items:center}
+/* тонкая строка под датой: метка дня, щит, предупреждения */
+.submeta{display:flex;flex-wrap:wrap;align-items:center;gap:0 8px;margin:6px 0 16px;
+  font-size:12px;line-height:1.7;color:var(--dim)}
+.submeta .sep{color:var(--dim2);opacity:.6}
+.smb{appearance:none;background:none;border:0;padding:0;margin:0;font:inherit;color:var(--dim);
+  cursor:pointer;border-bottom:1px dashed var(--line);transition:color .15s,border-color .15s}
+.smb b{font-weight:600;color:var(--fg)}
+.smb:hover{color:var(--fg);border-bottom-color:var(--dim2)}
+.smb.on{color:var(--acc);border-bottom-color:color-mix(in srgb,var(--acc) 45%,transparent)}
+.smb.on b{color:var(--acc)}
+.smb.warn{color:var(--warn);border-bottom-color:color-mix(in srgb,var(--warn) 45%,transparent)}
+.smb.warn b{color:var(--warn)}
+.submeta .stat{border-bottom:0;cursor:default}
 .load{display:flex;gap:2px;height:6px;border-radius:4px;overflow:hidden;background:var(--line2);margin:14px 0 9px}
 .load i{display:block;height:100%}
 .legend{display:flex;gap:13px;flex-wrap:wrap;font-size:11.5px;color:var(--dim)}
@@ -389,7 +407,7 @@ body.lock{position:fixed;left:0;right:0;width:100%;overflow:hidden}
 var KEY='devnprt.planner.v1', MEM=null;
 function load(){try{var s=localStorage.getItem(KEY);return s?JSON.parse(s):null}catch(e){return MEM}}
 function prune(){
-  if(S.log)for(var d in S.log){if(!S.log[d]||!S.log[d].shield)delete S.log[d]}
+  if(S.log)for(var d in S.log){var L=S.log[d];if(!L||(!L.shield&&!L.wake&&!L.sleep))delete S.log[d]}
   if(S.items)for(var k in S.items){if(!S.items[k]||!S.items[k].length)delete S.items[k]}
 }
 function save(){try{prune();localStorage.setItem(KEY,JSON.stringify(S))}catch(e){MEM=S}}
@@ -407,8 +425,13 @@ var wserial=function(s){return Math.round((prs(monday(s))-prs('2024-01-01'))/604
 var t2m=function(t){var a=t.split(':');return (+a[0])*60+(+a[1])};
 var m2t=function(m){m=((m%1440)+1440)%1440;return pad(Math.floor(m/60))+':'+pad(m%60)};
 /* отбой после полуночи относится к этим же суткам: 00:30 это конец дня, а не его начало */
-var dayStart=function(){return t2m(S.settings.wake)};
-var dayEnd=function(){var w=t2m(S.settings.wake),e=t2m(S.settings.sleep);if(e<=w)e+=1440;return e-30};
+/* окно дня: обычно из настроек, но у отдельного дня может быть своя смена */
+function winOf(d){
+  var L=(d&&S.log&&S.log[d])||{};
+  return {wake:L.wake||S.settings.wake, sleep:L.sleep||S.settings.sleep, own:!!(L.wake||L.sleep)};
+}
+var dayStart=function(d){return t2m(winOf(d).wake)};
+var dayEnd=function(d){var w=winOf(d),a=t2m(w.wake),e=t2m(w.sleep);if(e<=a)e+=1440;return e-30};
 var hm=function(m){if(m<=0)return '0 мин';var h=Math.floor(m/60),x=m%60;return (h?h+' ч':'')+(h&&x?' ':'')+(x?x+' мин':'')};
 var hmS=function(m){var h=m/60;return (Math.round(h*10)/10).toString().replace('.',',')+' ч'};
 var MONTH=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
@@ -426,6 +449,7 @@ var BASECATS=[
   {id:'content',name:'Контент',color:'#C98F86'},
   {id:'study',name:'ТИСБИ',color:'#9D93B8'},
   {id:'body',name:'Тело',color:'#A9B08E'},
+  {id:'work',name:'Работа',color:'#6FA8C9'},
   {id:'life',name:'Прочее',color:'#8A8A90'}
 ];
 var PALETTE=['#C2A170','#7FB7A3','#8FA2C8','#C98F86','#9D93B8','#A9B08E','#8A8A90','#D2A3A3','#86B3C9','#BBA77F'];
@@ -502,11 +526,80 @@ var STARTER=[
 ];
 var ONCE=[
   {date:'2026-11-07',title:'Вождение',dir:'pdd',min:120,ord:300,at:'15:00'},
-  {date:'2026-11-09',title:'Собеседование, Альфа-банк',dir:'life',min:120,ord:300,at:'12:00',
-   note:'С запасом на дорогу, после собеседования день продолжается'},
   {date:'2026-11-14',title:'Вождение',dir:'pdd',min:120,ord:300,at:'08:00'},
   {date:'2026-11-15',title:'Вождение',dir:'pdd',min:120,ord:300,at:'19:00'}
 ];
+/* ======== смена на объекте: фундаментные работы, 06:00 до 16:00 ========
+   Дни заданы списком, поэтому смену легко продлить или отменить:
+   добавьте или уберите дату в SHIFT.days. */
+var SHIFT={
+  days:['2026-11-12','2026-11-13',
+        '2026-11-17','2026-11-18','2026-11-19','2026-11-20',
+        '2026-11-24','2026-11-25','2026-11-26','2026-11-27'],
+  wake:'05:00',
+  add:[
+    {k:'road1',title:'Дорога на объект',dir:'work',min:30,ord:60,at:'05:30'},
+    {k:'shift',title:'Фундаментные работы',dir:'work',min:600,ord:70,at:'06:00',
+     note:'Смена с 6:00 до 16:00. Еда и перерывы внутри смены, отдельным делом не считаются'},
+    {k:'road2',title:'Дорога домой',dir:'work',min:30,ord:80,at:'16:00'},
+    {k:'reset',title:'Душ и перекус',dir:'life',min:25,ord:100,
+     note:'Переключение со смены на вечер, без него вечер съедается усталостью'}
+  ],
+  /* что в день смены не ставится: либо внутри смены, либо не влезает */
+  drop:['lunch','sites2','android2','loc','shoot','pract'],
+  /* правки обычных дел под смену */
+  tune:{
+    morning:{at:'05:00',min:30},
+    dinner:{at:'18:40'},
+    sites1:{min:90,note:'Вечерний блок после смены: сперва ответы, потом новые адресаты'},
+    android1:{min:90,core:false,optional:true,
+      note:'После смены это поддержание, а не погружение. Выжаты - снимайте без вины, длинный заход по Android стоит в выходной'},
+    pdd1:{min:30}
+  }
+};
+function isShift(d){return SHIFT.days.indexOf(d)>=0}
+/* разложить смену в день: идемпотентно, можно звать сколько угодно раз */
+function applyShift(d){
+  if(!isShift(d))return;
+  var L=logOf(d); if(!L.wake)L.wake=SHIFT.wake;
+  var list=dayListW(d);
+  /* снять лишнее, но не трогать то, где уже записано время */
+  var gone={},kept=[];
+  S.items[d]=list.filter(function(x){
+    var k=String(x.rep||'').slice(2);
+    if(SHIFT.drop.indexOf(k)>=0){
+      if(+x.done>0){kept.push(x);return true}  /* уже отмечено: не теряем, привяжем к смене */
+      gone[x.id]=1;return false;
+    }
+    return true;
+  });
+  list=S.items[d];
+  /* в дни с залом билеты уже идут вместе с ним, отдельный блок лишний */
+  if(list.some(function(x){return x.rep==='r-gym'})){
+    S.items[d]=list.filter(function(x){
+      if(x.rep==='r-pdd1'&&!(+x.done>0)){gone[x.id]=1;return false}
+      return true;
+    });
+    list=S.items[d];
+  }
+  list.forEach(function(x){x.with=(x.with||[]).filter(function(w){return !gone[w]})});
+  list.forEach(function(x){
+    var t=SHIFT.tune[String(x.rep||'').slice(2)];
+    if(!t)return;
+    for(var f in t)x[f]=t[f];
+  });
+  SHIFT.add.forEach(function(r){
+    if(list.some(function(x){return x.rep==='r-'+r.k}))return;
+    list.push(I({title:r.title,dir:r.dir,min:r.min,ord:r.ord,at:r.at||null,note:r.note||'',rep:'r-'+r.k}));
+  });
+  /* то, что уже отмечено, идёт внутри смены, а не спорит с ней за час */
+  var sh=list.filter(function(x){return x.rep==='r-shift'})[0];
+  if(sh)kept.forEach(function(x){
+    if(x.with.indexOf(sh.id)<0)x.with.push(sh.id);
+    if(sh.with.indexOf(x.id)<0)sh.with.push(x.id);
+  });
+}
+
 /* дни, где стартовое расписание само подвинуто или снято */
 var SEEDSKIP={'2026-11-14':['tisbi-odd']};
 var SEEDAT={'2026-11-09':{lunch:'14:10'},'2026-11-15':{dinner:'17:30'}};
@@ -539,6 +632,8 @@ function seedDay(d){
     if(list.some(function(x){return x.title===r.title&&x.at===r.at}))return;
     list.push(I({title:r.title,dir:r.dir,min:r.min,ord:r.ord,at:r.at||null,note:r.note||''}));
   });
+  applyShift(d);
+  list=S.items[d]||[];
   if(!list.length)delete S.items[d];
   return list.length;
 }
@@ -628,6 +723,30 @@ else if(S.items&&!Object.keys(S.items).length&&(S.v||1)>=7){var _t0=todayIso();s
 if(!S.cats||!S.cats.length)S.cats=JSON.parse(JSON.stringify(BASECATS));
 if(!S.items)S.items={};
 if(!S.log)S.log={};
+/* ===== версия 8: банк отложен, вместо него смена на объекте ===== */
+(function migrate8(){
+  if(!S||(S.v||1)>=8)return;
+  /* категория для оплачиваемой смены */
+  if(!S.cats.some(function(c){return c.id==='work'})){
+    var life=-1;
+    S.cats.forEach(function(c,i){if(c.id==='life')life=i});
+    var w={id:'work',name:'Работа',color:'#6FA8C9'};
+    if(life>=0)S.cats.splice(life,0,w); else S.cats.push(w);
+  }
+  /* собеседование в банке: снимаем только в будущих днях, прошлое не переписываем */
+  var bank='2026-11-09';
+  if(S.items[bank]&&bank>=todayIso()){
+    S.items[bank]=S.items[bank].filter(function(x){
+      return !(/Альфа|банк/i.test(x.title||'')&&!(+x.done>0));
+    });
+    if(!S.items[bank].length)delete S.items[bank];
+  }
+  /* дни смены: пустые разложить целиком, уже разложенные дополнить */
+  SHIFT.days.forEach(function(d){
+    if(S.items[d]&&S.items[d].length)applyShift(d); else seedDay(d);
+  });
+  S.v=8; save();
+})();
 if(S.settings){delete S.settings.mode;delete S.settings.norms;delete S.settings.parity}
 if(S.ui&&S.ui.view==='tasks')S.ui.view='day';
 
@@ -652,7 +771,7 @@ function dayGroups(d){
     o.doneMin=(+o.ref.done||0);
     o.done=!o.skipped&&o.min>0&&o.doneMin>=o.min-1;
     o.key=ordKey(o);
-    o.s=dayStart();o.e=dayStart();
+    o.s=dayStart(d);o.e=dayStart(d);
   });
   var act=items.filter(function(x){return !x.skipped}),byId={},adj={},k;
   act.forEach(function(o){byId[o.id]=o;adj[o.id]={}});
@@ -674,8 +793,8 @@ function dayGroups(d){
   return {L:L,items:items,groups:groups};
 }
 /* раскладка: метки на своих местах, остальное подряд от подъёма */
-function layDay(groups){
-  var start=dayStart(),guard;
+function layDay(groups,d){
+  var start=dayStart(d),guard;
   var anc=groups.filter(function(g){return g.fix}).sort(function(a,b){return t2m(a.at)-t2m(b.at)});
   var flo=groups.filter(function(g){return !g.fix}).sort(function(a,b){return (a.key-b.key)||((a.lead.title<b.lead.title)?-1:1)});
   anc.forEach(function(g){g.s=t2m(g.at);g.e=g.s+g.len});
@@ -695,7 +814,7 @@ function layDay(groups){
 }
 function planDay(d){
   var G=dayGroups(d),L=G.L,items=G.items,groups=G.groups,i,j;
-  var lay=layDay(groups),anc=lay.anchors,flo=lay.floats;
+  var lay=layDay(groups,d),anc=lay.anchors,flo=lay.floats;
   groups.forEach(function(g){
     g.mem.forEach(function(x){
       x.s=g.s;x.e=g.s+x.min;x.gEnd=g.e;x.num=g.num||0;x.fixG=g.fix;
@@ -715,7 +834,7 @@ function planDay(d){
     clash.push([anc[i].lead,anc[j].lead]);
   }
   items.sort(function(a,b){return (a.s-b.s)||(a.skipped?1:0)-(b.skipped?1:0)||(b.min-a.min)||(a.title<b.title?-1:1)});
-  var start=dayStart(),end=dayEnd(),sleepM=t2m(S.settings.sleep); if(sleepM<=start)sleepM+=1440;
+  var start=dayStart(d),end=dayEnd(d),sleepM=t2m(winOf(d).sleep); if(sleepM<=start)sleepM+=1440;
   var merged=[],breaks=[],occupied=0,gapMax=0;
   groups.slice().sort(function(a,b){return a.s-b.s}).forEach(function(g){
     var last=merged[merged.length-1];
@@ -861,23 +980,27 @@ function toast(t,undo){
 function viewDay(){
   var d=S.ui.date,L=logOf(d),p=planDay(d),h='';
   var isT=d===todayIso();
-  h+='<div class="dayhead"><div class="dh-t"><div class="lab">'+(isT?'Сегодня':(d===addD(todayIso(),1)?'Завтра':(d===addD(todayIso(),-1)?'Вчера':'День')))+'</div>'+
-     '<h1 class="h1" style="margin-top:2px">'+dateLong(d)+'</h1></div><div class="top-sp"></div>'+
-     '<div class="datenav"><button class="iconbtn" data-act="dday" data-v="-1">'+IC.left+'</button>'+
-     '<button class="btn sm ghost" data-act="dtoday">Сегодня</button>'+
-     '<button class="iconbtn" data-act="dday" data-v="1">'+IC.right+'</button></div></div>';
-  h+='<div class="chips">'+
-     '<button class="chip" data-act="addDay2">'+IC.plus+' Дело</button>'+
-     '<button class="chip'+(L.shield?' acc':'')+'" data-act="shield">Щит <b>'+(L.shield?'стоит':shieldsLeft()+' из 2')+'</b></button>'+
-     (p.clash.length?'<button class="chip warn" data-act="clashWhy">Метки спорят: <b>'+p.clash.length+'</b></button>':'')+
-     (p.late?'<span class="chip warn">После отбоя: <b>'+p.late+'</b></span>':'')+
-     '</div>';
+  var rel=isT?'Сегодня':(d===addD(todayIso(),1)?'Завтра':(d===addD(todayIso(),-1)?'Вчера':''));
+  var wn=winOf(d),meta=[];
+  if(rel)meta.push('<span class="stat">'+rel+'</span>');
+  if(!isT)meta.push('<button class="smb" data-act="dtoday">К сегодня</button>');
+  meta.push('<button class="smb'+(wn.own?' on':'')+'" data-act="dayWin">Окно <b>'+wn.wake+'–'+m2t(dayEnd(d))+'</b></button>');
+  meta.push('<button class="smb'+(L.shield?' on':'')+'" data-act="shield">'+
+            (L.shield?'Щит <b>стоит</b>':'Щит <b>'+shieldsLeft()+' из 2</b>')+'</button>');
+  if(p.clash.length)meta.push('<button class="smb warn" data-act="clashWhy">Метки спорят: <b>'+p.clash.length+'</b></button>');
+  if(p.late)meta.push('<span class="stat" style="color:var(--warn)">После отбоя: <b>'+p.late+'</b></span>');
+  h+='<div class="dayhead tight">'+
+     '<h1 class="h1">'+dateLong(d)+'</h1>'+
+     '<div class="datenav"><button class="iconbtn" data-act="dday" data-v="-1" aria-label="Предыдущий день">'+IC.left+'</button>'+
+     '<button class="iconbtn" data-act="dday" data-v="1" aria-label="Следующий день">'+IC.right+'</button></div>'+
+     '<div class="top-sp"></div></div>'+
+     '<div class="submeta">'+meta.join('<span class="sep">·</span>')+'</div>';
   /* сводка */
   h+='<div class="card"><div class="statrow">'+ring(p.ratio)+
      '<div style="flex:1;min-width:0"><div style="font-size:15px">Сделано '+hm(p.done)+' из '+hm(p.planned)+'</div>'+
      '<button class="why" data-act="freeWhy">'+
-       (p.planned?('Свободно '+hm(p.freeMin)+' из '+hm(dayEnd()-dayStart())+' · день закрывается в '+m2t(p.endAt)):
-                  ('День пустой: свободно всё окно, '+hm(dayEnd()-dayStart())))+' <i>?</i></button>'+
+       (p.planned?('Свободно '+hm(p.freeMin)+' из '+hm(dayEnd(d)-dayStart(d))+' · день закрывается в '+m2t(p.endAt)):
+                  ('День пустой: свободно всё окно, '+hm(dayEnd(d)-dayStart(d))))+' <i>?</i></button>'+
      '<div class="load">'+catKeys().map(function(k){
         var v=p.byDir[k]||0;if(!v)return '';
         return '<i style="flex:'+v+';background:'+catColor(k)+'"></i>';
@@ -1263,7 +1386,7 @@ function viewSet(){
     '<button class="btn sm" data-act="copyData">Скопировать текстом</button>'+
     '<button class="btn sm danger" data-act="reset">Сбросить всё</button></div>'+
     '<input type="file" id="fileIn" accept="application/json,.json" style="display:none"></div>';
-  h+='<div class="dim" style="font-size:11.5px;text-align:center;margin:18px 0 30px">devnprt.planner · сборка 15, ноябрь 2026 · работает без интернета</div>';
+  h+='<div class="dim" style="font-size:11.5px;text-align:center;margin:18px 0 30px">devnprt.planner · сборка 16, ноябрь 2026 · работает без интернета</div>';
   V.innerHTML=h;
 }
 
@@ -1370,7 +1493,7 @@ function sheetMenu(id){
     '<div class="dim" style="font-size:12px;margin:-9px 0 13px">'+where+' · '+
       (ahead?('стоит ещё в '+ahead+' '+(ahead%10===1&&ahead%100!==11?'дне':'днях')+' впереди'):'только в этом дне')+'</div>'+
     (o.clash?'<div class="dim" style="font-size:12px;margin:-6px 0 12px;line-height:1.5;color:var(--warn)">Две метки времени стоят на один час. Сдвиньте одну из них или снимите метку.</div>':'')+
-    (o.late?'<div class="dim" style="font-size:12px;margin:-6px 0 12px;line-height:1.5;color:var(--warn)">При нынешнем порядке заканчивается после отбоя '+S.settings.sleep+'. Поднимите дело выше или укоротите.</div>':'')+
+    (o.late?'<div class="dim" style="font-size:12px;margin:-6px 0 12px;line-height:1.5;color:var(--warn)">При нынешнем порядке заканчивается после отбоя '+winOf(d).sleep+'. Поднимите дело выше или укоротите.</div>':'')+
     (mvb?'<div class="movebar">'+
        '<button type="button" data-act="mvUp" data-id="'+id+'">'+IC.up+'<span>Выше</span></button>'+
        '<button type="button" data-act="mvDn" data-id="'+id+'">'+IC.down+'<span>Ниже</span></button>'+
@@ -1640,17 +1763,43 @@ document.addEventListener('click',function(e){
       if(sl){sl.value=((+sl.value+(+v))%1440+1440)%1440;hintTime(pn)}
       break; }
     case 'freeWhy': {
-      var pf2=planDay(d),win2=dayEnd()-dayStart();
+      var pf2=planDay(d),win2=dayEnd(d)-dayStart(d),wn2=winOf(d);
       var lines=catKeys().filter(function(k){return pf2.byDir[k]}).map(function(k){
         return '<div class="trow"><span class="nm">'+catName(k)+'</span><span class="mt">'+hm(pf2.byDir[k])+'</span></div>'}).join('');
       openSheet('<h3>Откуда взялось «свободно '+hm(pf2.freeMin)+'»</h3>'+
         '<div class="dim" style="font-size:13px;line-height:1.6;margin:-6px 0 12px">'+
-        'Окно дня это время от подъёма до отбоя: с '+S.settings.wake+' до '+m2t(dayEnd())+', всего '+hm(win2)+'. '+
+        'Окно дня это время от подъёма до отбоя: с '+wn2.wake+' до '+m2t(dayEnd(d))+', всего '+hm(win2)+'.'+
+        (wn2.own?' Для этого дня окно задано отдельно.':'')+' '+
         'Дела этого дня занимают '+hm(pf2.planned)+'. Разница и есть свободное время: '+hm(win2)+' минус '+hm(pf2.planned)+' это '+hm(pf2.freeMin)+'. '+
         'Совмещённые дела считаются один раз, по самому длинному из них. Подъём и отбой меняются в настройках.</div>'+
         (lines?('<div class="card pad0" style="padding:4px 13px">'+lines+'</div>'):'')+
         '<div class="row-btns" style="margin-top:14px"><button class="btn" data-act="go" data-v="set">Открыть настройки</button>'+
         '<button class="btn ghost" data-act="closeSheet">Понятно</button></div>');
+      break; }
+    case 'dayWin': {
+      var wq=winOf(d);
+      openSheet('<h3>Окно дня '+dateShort(d)+'</h3>'+
+        '<div class="dim" style="font-size:13px;line-height:1.6;margin:-6px 0 12px">'+
+        'Подъём и отбой только для этого дня: смена, ранний выезд, отсыпной. '+
+        'Остальные дни берут время из настроек ('+S.settings.wake+'–'+S.settings.sleep+'). '+
+        'Дела без метки времени начинают идти от подъёма.</div>'+
+        '<div style="display:flex;gap:12px"><div class="f" style="flex:1"><label>Подъём</label>'+
+        '<input type="time" id="dw_wake" value="'+wq.wake+'"></div>'+
+        '<div class="f" style="flex:1"><label>Отбой</label>'+
+        '<input type="time" id="dw_sleep" value="'+wq.sleep+'"></div></div>'+
+        '<div class="row-btns" style="margin-top:4px"><button class="btn pri" data-act="dayWinSave">Сохранить</button>'+
+        (wq.own?'<button class="btn ghost" data-act="dayWinReset">Как обычно</button>':'')+
+        '<button class="btn ghost" data-act="closeSheet">Отмена</button></div>');
+      break; }
+    case 'dayWinSave': {
+      var lw=logOf(d),nw=document.getElementById('dw_wake').value,ns=document.getElementById('dw_sleep').value;
+      if(nw&&nw!==S.settings.wake)lw.wake=nw; else delete lw.wake;
+      if(ns&&ns!==S.settings.sleep)lw.sleep=ns; else delete lw.sleep;
+      save();closeSheet();render();toast('Окно дня: '+winOf(d).wake+'–'+winOf(d).sleep);
+      break; }
+    case 'dayWinReset': {
+      var lr=logOf(d);delete lr.wake;delete lr.sleep;
+      save();closeSheet();render();toast('Окно как в настройках');
       break; }
     case 'clashWhy': openSheet('<h3>Две метки времени спорят</h3>'+
       '<div class="dim" style="font-size:13px;line-height:1.55;margin:-6px 0 4px">В этом дне два дела с точным временем попадают на один час. '+
